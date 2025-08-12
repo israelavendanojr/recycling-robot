@@ -59,8 +59,13 @@ def start_web_dashboard(classifier, host="0.0.0.0", port=8000, infer_hz=5.0):
             }
 
             # Overlay -> JPEG
-            disp = classifier.create_overlay_text(frame, results)
-            ok, buf = cv2.imencode(".jpg", disp, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+            disp = classifier.create_overlay_text(frame, results)  # Returns BGR
+            
+            # Convert BGR back to RGB for proper web display
+            disp_rgb = cv2.cvtColor(disp, cv2.COLOR_BGR2RGB)
+            
+            # Encode as JPEG
+            ok, buf = cv2.imencode(".jpg", disp_rgb, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
             if not ok:
                 continue
 
