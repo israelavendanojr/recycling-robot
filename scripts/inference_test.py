@@ -1,446 +1,301 @@
-import torch
-import torch.nn.functional as F
+# scripts/inference_test.py
+import os, sys, time, cv2, torch, torch.nn.functional as F
 from torchvision import transforms
 from picamera2 import Picamera2
-import cv2
-import time
 from PIL import Image
 import numpy as np
-import os
-import sys
 
-# Add project root to path to import your modules
+# Allow "from src..." imports if your project has them
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-# Import your model architecture
 try:
     from src.classifier.model import get_model
     from src.classifier.utils import get_transforms
-except ImportError as e:
+except Exception as e:
     print(f"Warning: Could not import project modules: {e}")
     print("Falling back to standalone model loading...")
     get_model = None
     get_transforms = None
 
+
 class RecyclingClassifier:
-    def __init__(self, model_path="recycler.pth", device=None):
-        """
-        Initialize the recycling classifier
-        
-        Args:
-            model_path: Path to the trained PyTorch model
-            device: Device to run inference on (cuda/cpu)
-        """
+    def __init__(self, model_path="recycler.pth", device=None, input_size=224, cam_size=(640, 480)):
         self.device = device if device else ('cuda' if torch.cuda.is_available() else 'cpu')
+        self.input_size = input_size
         print(f"Using device: {self.device}")
-        
-        # Define class names FIRST (needed for model loading)
-        self.class_names = [
-            'cardboard',
-            'glass', 
-            'metal',
-            'plastic',
-            'trash'
-        ]
-        
-        # Check if model file exists
+
+        self.class_names = ['cardboard', 'glass', 'metal', 'plastic', 'trash']
+
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
-        
-        # Load the trained model
-        self.model = self.load_model(model_path)
+
+        self.model = self._load_model(model_path)
         self.model.eval()
-        
-        # Define preprocessing transforms (matching your training setup)
-        self.transform = self.get_preprocessing_transforms()
-        
-        # Initialize camera
-        self.setup_camera()
-    
-    def load_model(self, model_path):
-        """Load the model with proper error handling for .pth files"""
+
+        self.transform = self._get_transforms()
+        self._setup_camera(cam_size)
+
+    def _load_model(self, model_path):
         try:
-            # First, peek at what's in the file
             checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
             print(f"Loaded checkpoint type: {type(checkpoint)}")
-            
-            # If it's an OrderedDict, it's a state dict
+
+            # State dict only
             if isinstance(checkpoint, dict) and 'state_dict' not in checkpoint:
-                print("Detected state dict format, need to reconstruct model...")
-                # This is a state dict, we need the model architecture
                 if get_model is not None:
                     model = get_model(num_classes=len(self.class_names))
-                    model.load_state_dict(checkpoint)
-                    model.to(self.device)
-                    model.eval()
-                    print("✓ Loaded model from state dict using project architecture")
-                    return model
                 else:
-                    # Fallback: try to create a basic MobileNetV2 model
-                    print("Project modules not available, trying to create MobileNetV2...")
                     from torchvision import models
                     from torch import nn
-                    
-                    model = models.mobilenet_v2(weights=None)  # Don't load pretrained weights
-                    model.classifier[1] = nn.Linear(model.last_channel, len(self.class_names))
-                    model.load_state_dict(checkpoint)
-                    model.to(self.device)
-                    model.eval()
-                    print("✓ Loaded model using fallback MobileNetV2 architecture")
-                    return model
-                    
-            # If it has 'state_dict' key, extract it
-            elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-                print("Found 'state_dict' key in checkpoint...")
-                state_dict = checkpoint['state_dict']
-                if get_model is not None:
-                    model = get_model(num_classes=len(self.class_names))
-                    model.load_state_dict(state_dict)
-                    model.to(self.device)
-                    model.eval()
-                    print("✓ Loaded model from checkpoint state dict")
-                    return model
-                else:
-                    print("Project modules not available, trying fallback...")
-                    from torchvision import models
-                    from torch import nn
-                    
                     model = models.mobilenet_v2(weights=None)
                     model.classifier[1] = nn.Linear(model.last_channel, len(self.class_names))
-                    model.load_state_dict(state_dict)
-                    model.to(self.device)
-                    model.eval()
-                    print("✓ Loaded model using fallback architecture")
-                    return model
-                    
-            # If it's already a model object
-            else:
-                checkpoint.eval()
-                checkpoint.to(self.device)
-                print("✓ Loaded complete PyTorch model (.pth)")
-                return checkpoint
-                
+                model.load_state_dict(checkpoint)
+                model.to(self.device)
+                print("✓ Loaded model from state dict")
+                return model
+
+            # Checkpoint with 'state_dict'
+            if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+                state = checkpoint['state_dict']
+                if get_model is not None:
+                    model = get_model(num_classes=len(self.class_names))
+                else:
+                    from torchvision import models
+                    from torch import nn
+                    model = models.mobilenet_v2(weights=None)
+                    model.classifier[1] = nn.Linear(model.last_channel, len(self.class_names))
+                model.load_state_dict(state)
+                model.to(self.device)
+                print("✓ Loaded model from checkpoint state dict")
+                return model
+
+            # Full model object
+            checkpoint.to(self.device)
+            print("✓ Loaded complete PyTorch model")
+            return checkpoint
+
         except Exception as e:
             print(f"✗ Error loading model: {e}")
-            import traceback
-            traceback.print_exc()
-            raise Exception(f"Could not load model from {model_path}")
-    
-    def get_preprocessing_transforms(self):
-        """Get preprocessing transforms matching your training setup"""
+            raise
+
+    def _get_transforms(self):
         if get_transforms is not None:
-            # Use the transforms from your project
-            _, transform = get_transforms(input_size=224)
-            return transform
-        else:
-            # Fallback to manual transform definition
-            return transforms.Compose([
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                                   std=[0.229, 0.224, 0.225])  # ImageNet normalization
-            ])
-    
-    def setup_camera(self):
-        """Initialize and configure the camera"""
+            _, t = get_transforms(input_size=self.input_size)
+            return t
+        return transforms.Compose([
+            transforms.Resize((self.input_size, self.input_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225]),
+        ])
+
+    def _setup_camera(self, size):
         try:
             self.picam2 = Picamera2()
-            self.picam2.configure(self.picam2.create_preview_configuration({
-                "format": "RGB888", 
-                "size": (1280, 720)
-            }))
+            self.picam2.configure(self.picam2.create_preview_configuration(
+                {"format": "RGB888", "size": size}
+            ))
             self.picam2.start()
-            time.sleep(0.5)  # Allow camera to warm up
-            print("✓ Camera initialized successfully")
+            time.sleep(0.4)
+            print("✓ Camera initialized")
         except Exception as e:
             print(f"✗ Failed to initialize camera: {e}")
-            print("Make sure you're running on a Raspberry Pi with camera enabled")
             raise
-    
+
     def capture_frame(self):
-        """Capture a frame from the camera"""
-        frame = self.picam2.capture_array()
-        return frame
-    
-    def preprocess_frame(self, frame):
-        """
-        Preprocess the captured frame for model input
-        
-        Args:
-            frame: RGB numpy array from camera
-            
-        Returns:
-            preprocessed tensor ready for model inference
-        """
-        # Convert numpy array to PIL Image
-        pil_image = Image.fromarray(frame)
-        
-        # Apply preprocessing transforms
-        preprocessed = self.transform(pil_image)
-        
-        # Add batch dimension and move to device
-        preprocessed = preprocessed.unsqueeze(0).to(self.device)
-        
-        return preprocessed
-    
-    def run_inference(self, preprocessed_frame):
-        """
-        Run model inference on preprocessed frame
-        
-        Args:
-            preprocessed_frame: Preprocessed tensor
-            
-        Returns:
-            predicted_class_idx: Index of predicted class
-            confidence: Confidence score (0-1)
-            all_probabilities: All class probabilities
-        """
-        with torch.no_grad():
-            # Run inference
-            outputs = self.model(preprocessed_frame)
-            
-            # Apply softmax to get probabilities
-            probabilities = F.softmax(outputs, dim=1)
-            
-            # Get predicted class and confidence
-            confidence, predicted_class_idx = torch.max(probabilities, 1)
-            
-            return predicted_class_idx.item(), confidence.item(), probabilities[0].cpu().numpy()
-    
+        # Returns RGB ndarray (H,W,3)
+        return self.picam2.capture_array()
+
+    def preprocess_frame(self, frame_rgb):
+        pil = Image.fromarray(frame_rgb)
+        x = self.transform(pil).unsqueeze(0).to(self.device)
+        return x
+
+    @torch.inference_mode()
+    def run_inference(self, x):
+        logits = self.model(x)
+        if isinstance(logits, (list, tuple)):
+            logits = logits[0]
+        probs = F.softmax(logits, dim=1)
+        conf, idx = torch.max(probs, dim=1)
+        return idx.item(), float(conf.item()), probs[0].detach().cpu().numpy()
+
     def classify_current_view(self, save_frame=False, show_all_probs=False):
-        """
-        Capture frame, run inference, and return results
-        
-        Args:
-            save_frame: Whether to save the captured frame
-            show_all_probs: Whether to show probabilities for all classes
-            
-        Returns:
-            dict: Classification results
-        """
-        # Capture frame
         frame = self.capture_frame()
-        print(f"Captured frame: {frame.shape}")
-        
-        # Save frame if requested
         if save_frame:
             cv2.imwrite("latest_capture.jpg", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-            print("Frame saved as 'latest_capture.jpg'")
-        
-        # Preprocess frame
-        preprocessed = self.preprocess_frame(frame)
-        
-        # Run inference
-        class_idx, confidence, all_probs = self.run_inference(preprocessed)
-        
-        # Get class name
-        class_name = self.class_names[class_idx] if class_idx < len(self.class_names) else f"Unknown_Class_{class_idx}"
-        
-        results = {
-            'predicted_class': class_name,
-            'class_index': class_idx,
-            'confidence': confidence,
-            'frame': frame
+            print("Saved latest_capture.jpg")
+        x = self.preprocess_frame(frame)
+        idx, conf, probs = self.run_inference(x)
+        name = self.class_names[idx] if idx < len(self.class_names) else f"Unknown_{idx}"
+
+        out = {
+            "predicted_class": name,
+            "class_index": idx,
+            "confidence": conf,
+            "frame": frame,
         }
-        
         if show_all_probs:
-            results['all_probabilities'] = {
-                self.class_names[i]: prob for i, prob in enumerate(all_probs)
-            }
-        
-        return results
-    
-    def run_continuous_inference(self, delay_seconds=2, save_frames=False):
-        """
-        Run continuous inference loop
-        
-        Args:
-            delay_seconds: Delay between inferences
-            save_frames: Whether to save each frame
-        """
-        print("\n=== Starting Continuous Inference ===")
-        print("Press Ctrl+C to stop...")
-        
-        frame_count = 0
-        try:
-            while True:
-                results = self.classify_current_view(save_frame=save_frames, show_all_probs=True)
-                
-                frame_count += 1
-                print(f"\n--- Frame {frame_count} ---")
-                print(f"Predicted Class: {results['predicted_class']}")
-                print(f"Confidence: {results['confidence']:.4f} ({results['confidence']*100:.2f}%)")
-                
-                # Show confidence level
-                if results['confidence'] > 0.8:
-                    print("High confidence prediction")
-                elif results['confidence'] > 0.6:
-                    print("Medium confidence prediction") 
-                else:
-                    print("Low confidence prediction")
-                
-                # Show all probabilities
-                print("All class probabilities:")
-                for class_name, prob in results['all_probabilities'].items():
-                    print(f"  {class_name}: {prob:.4f} ({prob*100:.2f}%)")
-                
-                time.sleep(delay_seconds)
-                
-        except KeyboardInterrupt:
-            print("\n\nStopping continuous inference...")
-    
+            out["all_probabilities"] = {self.class_names[i]: float(probs[i])
+                                        for i in range(min(len(probs), len(self.class_names)))}
+        return out
+
+    def create_overlay_text(self, frame_rgb, results):
+        img = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+        font, scale, thick = cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+        conf = results["confidence"]
+        color = (0, 255, 0) if conf > 0.8 else ((0, 165, 255) if conf > 0.6 else (0, 0, 255))
+        text = f"{results['predicted_class']} ({conf*100:.1f}%)"
+        (tw, th), _ = cv2.getTextSize(text, font, scale, thick)
+        cv2.rectangle(img, (10, 10), (tw + 20, th + 30), (0, 0, 0), -1)
+        cv2.putText(img, text, (15, 35), font, scale, color, thick, cv2.LINE_AA)
+
+        if 'all_probabilities' in results:
+            y = 70
+            for cls, p in results['all_probabilities'].items():
+                t = f"{cls}: {p*100:.1f}%"
+                c = color if cls == results['predicted_class'] else (255, 255, 255)
+                cv2.putText(img, t, (15, y), font, 0.5, c, 1, cv2.LINE_AA)
+                y += 22
+
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        cv2.putText(img, ts, (15, img.shape[0] - 15), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        return img
+
     def cleanup(self):
-        """Clean up camera resources"""
-        if hasattr(self, 'picam2'):
+        if hasattr(self, "picam2"):
             self.picam2.close()
             print("✓ Camera closed")
 
-def test_model_loading(model_path):
-    """Test if the model can be loaded correctly"""
-    print(f"Testing model loading from: {model_path}")
-    
-    if not os.path.exists(model_path):
-        print(f"✗ Model file not found: {model_path}")
+
+def test_display_capability():
+    print("Testing display capability...")
+    if 'DISPLAY' not in os.environ:
+        print("✗ DISPLAY not set")
         return False
-    
     try:
-        # Load and inspect the file
-        device = 'cpu'  # Use CPU for testing
-        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
-        print(f"✓ File loaded successfully")
-        print(f"Content type: {type(checkpoint)}")
-        
-        if isinstance(checkpoint, dict):
-            if 'state_dict' in checkpoint:
-                print("✓ Found checkpoint with 'state_dict' key")
-                state_dict = checkpoint['state_dict']
-            else:
-                print("✓ Found state dictionary")
-                state_dict = checkpoint
-                
-            # Try to create model and load state dict
-            try:
-                from torchvision import models
-                from torch import nn
-                
-                model = models.mobilenet_v2(weights=None)
-                model.classifier[1] = nn.Linear(model.last_channel, 5)  # 5 classes
-                model.load_state_dict(state_dict)
-                model.eval()
-                
-                print(f"✓ Model reconstructed successfully")
-                print(f"Model type: {type(model)}")
-                
-                # Try a forward pass
-                dummy_input = torch.randn(1, 3, 224, 224)
-                with torch.no_grad():
-                    output = model(dummy_input)
-                print(f"✓ Forward pass successful, output shape: {output.shape}")
-                print(f"✓ Number of classes detected: {output.shape[1]}")
-                return True
-                
-            except Exception as model_error:
-                print(f"✗ Error reconstructing model: {model_error}")
-                return False
-        else:
-            # It's already a model
-            model = checkpoint
-            model.eval()
-            print(f"✓ Complete model loaded")
-            print(f"Model type: {type(model)}")
-            
-            # Try a forward pass
-            dummy_input = torch.randn(1, 3, 224, 224)
-            with torch.no_grad():
-                output = model(dummy_input)
-            print(f"✓ Forward pass successful, output shape: {output.shape}")
-            print(f"✓ Number of classes detected: {output.shape[1]}")
-            return True
-            
+        img = np.zeros((240, 320, 3), np.uint8)
+        cv2.putText(img, "Display OK - press any key", (15, 120),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.imshow("test", img); cv2.waitKey(0); cv2.destroyAllWindows()
+        print("✓ Display working")
+        return True
     except Exception as e:
-        print(f"✗ Error testing model: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"✗ Cannot create window: {e}")
         return False
 
+
 def main():
-    """Main function to run inference"""
     import argparse
-    
-    parser = argparse.ArgumentParser(description='Recycling Classification Inference')
-    parser.add_argument('--model_path', type=str, default='recycler.pth',
-                       help='Path to the model file')
-    parser.add_argument('--test_model', action='store_true',
-                       help='Test model loading without camera')
-    parser.add_argument('--single_shot', action='store_true',
-                       help='Run single inference instead of continuous')
-    parser.add_argument('--continuous', action='store_true', default=True,
-                       help='Run continuous inference (default)')
-    parser.add_argument('--delay', type=float, default=2.0,
-                       help='Delay between inferences in continuous mode')
-    parser.add_argument('--save_frames', action='store_true',
-                       help='Save captured frames')
-    
+    parser = argparse.ArgumentParser(description="Recycling Classification Inference")
+    parser.add_argument('--model_path', type=str, default='recycler.pth')
+    parser.add_argument('--test_model', action='store_true')
+    parser.add_argument('--test_display', action='store_true')
+    parser.add_argument('--single_shot', action='store_true')
+    parser.add_argument('--display', action='store_true', help='X11 display with cv2.imshow')
+    parser.add_argument('--console_only', action='store_true')
+    parser.add_argument('--delay', type=float, default=2.0)
+    parser.add_argument('--save_frames', action='store_true')
+    # web dashboard flags (served by scripts/web_dashboard.py)
+    parser.add_argument('--web', action='store_true', help='Serve dashboard at http://<pi-ip>:8000')
+    parser.add_argument('--port', type=int, default=8000)
+    parser.add_argument('--infer_hz', type=float, default=5.0)
+    parser.add_argument('--cam_w', type=int, default=640)
+    parser.add_argument('--cam_h', type=int, default=480)
     args = parser.parse_args()
-    
+
     print("=" * 60)
     print("Recycling Classification System")
     print("=" * 60)
-    
-    # Test model loading if requested
-    if args.test_model:
-        success = test_model_loading(args.model_path)
-        if success:
-            print("✓ Model test passed!")
-        else:
-            print("✗ Model test failed!")
+
+    if args.test_display:
+        test_display_capability()
         return
-    
+
+    if args.test_model:
+        # Quick load test on CPU only
+        try:
+            _ = torch.load(args.model_path, map_location='cpu', weights_only=False)
+            print("✓ Model file can be loaded on CPU")
+        except Exception as e:
+            print(f"✗ Model load failed: {e}")
+        return
+
+    classifier = None
     try:
-        # Initialize classifier
-        classifier = RecyclingClassifier(model_path=args.model_path)
-        print("✓ Classifier initialized successfully")
-        
+        classifier = RecyclingClassifier(
+            model_path=args.model_path,
+            input_size=224,
+            cam_size=(args.cam_w, args.cam_h)
+        )
+        print("✓ Classifier initialized")
+
+        if args.web:
+            print(f"\n🌐 Starting web dashboard on 0.0.0.0:{args.port}")
+            print("Open: http://<pi-ip>:%d/" % args.port)
+            # Import here to avoid Flask dependency unless needed
+            from web_dashboard import start_web_dashboard
+            start_web_dashboard(classifier, host="0.0.0.0", port=args.port, infer_hz=args.infer_hz)
+            return
+
         if args.single_shot:
-            # Single inference
-            print("\nRunning single inference...")
-            results = classifier.classify_current_view(save_frame=args.save_frames, show_all_probs=True)
-            
-            print(f"\n--- Classification Results ---")
-            print(f"Predicted Class: {results['predicted_class']}")
-            print(f"Confidence: {results['confidence']:.4f} ({results['confidence']*100:.2f}%)")
-            
-            # Show confidence level
-            if results['confidence'] > 0.8:
-                print("High confidence prediction")
-            elif results['confidence'] > 0.6:
-                print("Medium confidence prediction") 
+            res = classifier.classify_current_view(save_frame=args.save_frames, show_all_probs=True)
+            print("\n--- Classification Results ---")
+            print(f"Predicted Class: {res['predicted_class']}")
+            print(f"Confidence: {res['confidence']:.4f} ({res['confidence']*100:.2f}%)")
+            if 'all_probabilities' in res:
+                print("\nAll class probabilities:")
+                for k, v in res['all_probabilities'].items():
+                    print(f"  {k}: {v:.4f} ({v*100:.2f}%)")
+            return
+
+        if args.display and not args.console_only:
+            print("\n🖥️  X11 display mode...")
+            print(f"DISPLAY={os.environ.get('DISPLAY','<not set>')}")
+            if test_display_capability():
+                print("Press 'q' to quit.")
+                last_t = 0.0
+                while True:
+                    frame = classifier.capture_frame()
+                    t = time.time()
+                    if t - last_t >= max(0.1, args.delay):
+                        x = classifier.preprocess_frame(frame)
+                        idx, conf, probs = classifier.run_inference(x)
+                        name = classifier.class_names[idx]
+                        last_t = t
+                        res = {
+                            "predicted_class": name,
+                            "class_index": idx,
+                            "confidence": conf,
+                            "frame": frame,
+                            "all_probabilities": {classifier.class_names[i]: float(probs[i])
+                                                  for i in range(min(len(probs), len(classifier.class_names)))}
+                        }
+                    disp = classifier.create_overlay_text(frame, res if 'res' in locals() else {
+                        "predicted_class":"...", "confidence":0.0, "frame":frame})
+                    cv2.imshow("Recycling Classifier", disp)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                cv2.destroyAllWindows()
             else:
-                print("Low confidence prediction")
-                
-            # Show all probabilities
-            print("\nAll class probabilities:")
-            for class_name, prob in results['all_probabilities'].items():
-                print(f"  {class_name}: {prob:.4f} ({prob*100:.2f}%)")
-                
-        else:
-            # Continuous inference
-            classifier.run_continuous_inference(
-                delay_seconds=args.delay, 
-                save_frames=args.save_frames
-            )
-            
-    except Exception as e:
-        print(f"✗ Error during inference: {e}")
-        import traceback
-        traceback.print_exc()
-        
+                print("Display test failed. Falling back to console mode...")
+
+        # Console mode (continuous)
+        print("\n=== Console Mode (Ctrl+C to stop) ===")
+        while True:
+            res = classifier.classify_current_view(save_frame=args.save_frames, show_all_probs=True)
+            print(f"{time.strftime('%H:%M:%S')} | {res['predicted_class']} "
+                  f"({res['confidence']*100:.1f}%)")
+            time.sleep(args.delay)
+
+    except KeyboardInterrupt:
+        print("\nStopping...")
     finally:
-        # Clean up
-        if 'classifier' in locals():
+        if classifier:
             classifier.cleanup()
         print("✓ Cleanup completed")
+
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recycling Robot Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        .video-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .video-stream {
+            width: 100%;
+            border-radius: 8px;
+        }
+        .stats-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .prediction {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .prediction-class {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #2c3e50;
+        }
+        .confidence {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        .high-confidence { color: #27ae60; }
+        .medium-confidence { color: #f39c12; }
+        .low-confidence { color: #e74c3c; }
+        .probabilities {
+            margin-top: 20px;
+        }
+        .prob-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .prob-bar {
+            width: 100px;
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+        .prob-fill {
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s ease;
+        }
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Recycling Classification Robot</h1>
+            <p>Real-time object classification and monitoring</p>
+        </div>
+        
+        <div class="dashboard">
+            <div class="video-container">
+                <h2>Live Camera Feed</h2>
+                <img src="{{ url_for('video_feed') }}" class="video-stream">
+            </div>
+            
+            <div class="stats-container">
+                <h2>Classification Results</h2>
+                <div class="prediction">
+                    <div id="prediction-class" class="prediction-class">Loading...</div>
+                    <div id="confidence" class="confidence">Confidence: ---%</div>
+                </div>
+                
+                <div class="probabilities">
+                    <h3>All Class Probabilities</h3>
+                    <div id="prob-list">Loading...</div>
+                </div>
+                
+                <div style="margin-top: 20px; font-size: 12px; color: #666;">
+                    Last updated: <span id="timestamp">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update prediction
+                    document.getElementById('prediction-class').textContent = data.top_prediction;
+                    
+                    // Update confidence
+                    const confidencePct = (data.confidence * 100).toFixed(1);
+                    const confidenceEl = document.getElementById('confidence');
+                    confidenceEl.textContent = `Confidence: ${confidencePct}%`;
+                    
+                    // Set confidence color
+                    confidenceEl.className = 'confidence ';
+                    if (data.confidence > 0.8) {
+                        confidenceEl.className += 'high-confidence';
+                    } else if (data.confidence > 0.6) {
+                        confidenceEl.className += 'medium-confidence';
+                    } else {
+                        confidenceEl.className += 'low-confidence';
+                    }
+                    
+                    // Update probabilities
+                    const probList = document.getElementById('prob-list');
+                    probList.innerHTML = '';
+                    
+                    data.all_probabilities.forEach(([className, prob]) => {
+                        const probItem = document.createElement('div');
+                        probItem.className = 'prob-item';
+                        
+                        const probPct = (prob * 100).toFixed(1);
+                        probItem.innerHTML = `
+                            <span>${className}: ${probPct}%</span>
+                            <div class="prob-bar">
+                                <div class="prob-fill" style="width: ${probPct}%"></div>
+                            </div>
+                        `;
+                        
+                        probList.appendChild(probItem);
+                    });
+                    
+                    // Update timestamp
+                    const timestamp = new Date(data.timestamp).toLocaleTimeString();
+                    document.getElementById('timestamp').textContent = timestamp;
+                })
+                .catch(error => console.error('Error fetching stats:', error));
+        }
+        
+        // Update stats every second
+        updateStats();
+        setInterval(updateStats, 1000);
+    </script>
+</body>
+</html>
