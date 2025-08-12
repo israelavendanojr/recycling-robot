@@ -1,15 +1,3 @@
-# Test if model loads correctly
-# python scripts/inference_script.py --test_model
-
-# Single inference
-# python scripts/inference_script.py --single_shot --save_frames
-
-# Continuous inference (default)
-# python scripts/inference_script.py --delay 3.0
-
-# Continuous with frame saving
-# python scripts/inference_script.py --save_frames --delay 1.0
-
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
@@ -47,6 +35,15 @@ class RecyclingClassifier:
         self.device = device if device else ('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
         
+        # Define class names FIRST (needed for model loading)
+        self.class_names = [
+            'cardboard',
+            'glass', 
+            'metal',
+            'plastic',
+            'trash'
+        ]
+        
         # Check if model file exists
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
@@ -58,52 +55,77 @@ class RecyclingClassifier:
         # Define preprocessing transforms (matching your training setup)
         self.transform = self.get_preprocessing_transforms()
         
-        # Define class names (matching your dataset structure)
-        self.class_names = [
-            'cardboard',
-            'glass', 
-            'metal',
-            'plastic',
-            'trash'
-        ]
-        
         # Initialize camera
         self.setup_camera()
     
     def load_model(self, model_path):
         """Load the model with proper error handling for .pth files"""
         try:
-            # Try loading as a complete PyTorch model first (most common for .pth files)
-            model = torch.load(model_path, map_location=self.device, weights_only=False)
-            model.eval()
-            print("✓ Loaded complete PyTorch model (.pth)")
-            return model
-        except Exception as e1:
-            print(f"Failed to load as complete model: {e1}")
+            # First, peek at what's in the file
+            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+            print(f"Loaded checkpoint type: {type(checkpoint)}")
             
-            try:
-                # Try loading as state dict (if saved with torch.save(model.state_dict(), path))
+            # If it's an OrderedDict, it's a state dict
+            if isinstance(checkpoint, dict) and 'state_dict' not in checkpoint:
+                print("Detected state dict format, need to reconstruct model...")
+                # This is a state dict, we need the model architecture
                 if get_model is not None:
                     model = get_model(num_classes=len(self.class_names))
-                    state_dict = torch.load(model_path, map_location=self.device, weights_only=True)
-                    model.load_state_dict(state_dict)
+                    model.load_state_dict(checkpoint)
                     model.to(self.device)
                     model.eval()
                     print("✓ Loaded model from state dict using project architecture")
                     return model
                 else:
-                    raise ImportError("Cannot import model architecture and state dict loading failed")
-            except Exception as e2:
-                print(f"Failed to load as state dict: {e2}")
-                
-                try:
-                    # Try loading as TorchScript (fallback)
-                    model = torch.jit.load(model_path, map_location=self.device)
-                    print("✓ Loaded as TorchScript model")
+                    # Fallback: try to create a basic MobileNetV2 model
+                    print("Project modules not available, trying to create MobileNetV2...")
+                    from torchvision import models
+                    from torch import nn
+                    
+                    model = models.mobilenet_v2(weights=None)  # Don't load pretrained weights
+                    model.classifier[1] = nn.Linear(model.last_channel, len(self.class_names))
+                    model.load_state_dict(checkpoint)
+                    model.to(self.device)
+                    model.eval()
+                    print("✓ Loaded model using fallback MobileNetV2 architecture")
                     return model
-                except Exception as e3:
-                    print(f"Failed to load as TorchScript: {e3}")
-                    raise Exception(f"Could not load model from {model_path}. Tried PyTorch (.pth), state dict, and TorchScript loading.")
+                    
+            # If it has 'state_dict' key, extract it
+            elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+                print("Found 'state_dict' key in checkpoint...")
+                state_dict = checkpoint['state_dict']
+                if get_model is not None:
+                    model = get_model(num_classes=len(self.class_names))
+                    model.load_state_dict(state_dict)
+                    model.to(self.device)
+                    model.eval()
+                    print("✓ Loaded model from checkpoint state dict")
+                    return model
+                else:
+                    print("Project modules not available, trying fallback...")
+                    from torchvision import models
+                    from torch import nn
+                    
+                    model = models.mobilenet_v2(weights=None)
+                    model.classifier[1] = nn.Linear(model.last_channel, len(self.class_names))
+                    model.load_state_dict(state_dict)
+                    model.to(self.device)
+                    model.eval()
+                    print("✓ Loaded model using fallback architecture")
+                    return model
+                    
+            # If it's already a model object
+            else:
+                checkpoint.eval()
+                checkpoint.to(self.device)
+                print("✓ Loaded complete PyTorch model (.pth)")
+                return checkpoint
+                
+        except Exception as e:
+            print(f"✗ Error loading model: {e}")
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"Could not load model from {model_path}")
     
     def get_preprocessing_transforms(self):
         """Get preprocessing transforms matching your training setup"""
@@ -252,11 +274,11 @@ class RecyclingClassifier:
                 
                 # Show confidence level
                 if results['confidence'] > 0.8:
-                    print("🟢 High confidence prediction")
+                    print("High confidence prediction")
                 elif results['confidence'] > 0.6:
-                    print("🟡 Medium confidence prediction") 
+                    print("Medium confidence prediction") 
                 else:
-                    print("🔴 Low confidence prediction")
+                    print("Low confidence prediction")
                 
                 # Show all probabilities
                 print("All class probabilities:")
@@ -283,28 +305,49 @@ def test_model_loading(model_path):
         return False
     
     try:
-        # Try loading as PyTorch model first (most common for .pth)
+        # Load and inspect the file
         device = 'cpu'  # Use CPU for testing
-        model = torch.load(model_path, map_location=device, weights_only=False)
-        model.eval()
-        print(f"✓ PyTorch model loaded successfully")
-        print(f"Model type: {type(model)}")
+        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+        print(f"✓ File loaded successfully")
+        print(f"Content type: {type(checkpoint)}")
         
-        # Try a forward pass
-        dummy_input = torch.randn(1, 3, 224, 224)
-        with torch.no_grad():
-            output = model(dummy_input)
-        print(f"✓ Forward pass successful, output shape: {output.shape}")
-        print(f"✓ Number of classes detected: {output.shape[1]}")
-        return True
-        
-    except Exception as e1:
-        print(f"Failed as PyTorch model: {e1}")
-        
-        try:
-            # Try loading as TorchScript
-            model = torch.jit.load(model_path, map_location=device)
-            print(f"✓ TorchScript model loaded successfully")
+        if isinstance(checkpoint, dict):
+            if 'state_dict' in checkpoint:
+                print("✓ Found checkpoint with 'state_dict' key")
+                state_dict = checkpoint['state_dict']
+            else:
+                print("✓ Found state dictionary")
+                state_dict = checkpoint
+                
+            # Try to create model and load state dict
+            try:
+                from torchvision import models
+                from torch import nn
+                
+                model = models.mobilenet_v2(weights=None)
+                model.classifier[1] = nn.Linear(model.last_channel, 5)  # 5 classes
+                model.load_state_dict(state_dict)
+                model.eval()
+                
+                print(f"✓ Model reconstructed successfully")
+                print(f"Model type: {type(model)}")
+                
+                # Try a forward pass
+                dummy_input = torch.randn(1, 3, 224, 224)
+                with torch.no_grad():
+                    output = model(dummy_input)
+                print(f"✓ Forward pass successful, output shape: {output.shape}")
+                print(f"✓ Number of classes detected: {output.shape[1]}")
+                return True
+                
+            except Exception as model_error:
+                print(f"✗ Error reconstructing model: {model_error}")
+                return False
+        else:
+            # It's already a model
+            model = checkpoint
+            model.eval()
+            print(f"✓ Complete model loaded")
             print(f"Model type: {type(model)}")
             
             # Try a forward pass
@@ -315,9 +358,11 @@ def test_model_loading(model_path):
             print(f"✓ Number of classes detected: {output.shape[1]}")
             return True
             
-        except Exception as e2:
-            print(f"✗ Model loading failed for both PyTorch and TorchScript: {e2}")
-            return False
+    except Exception as e:
+        print(f"✗ Error testing model: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 def main():
     """Main function to run inference"""
@@ -368,11 +413,11 @@ def main():
             
             # Show confidence level
             if results['confidence'] > 0.8:
-                print("🟢 High confidence prediction")
+                print("High confidence prediction")
             elif results['confidence'] > 0.6:
-                print("🟡 Medium confidence prediction") 
+                print("Medium confidence prediction") 
             else:
-                print("🔴 Low confidence prediction")
+                print("Low confidence prediction")
                 
             # Show all probabilities
             print("\nAll class probabilities:")
