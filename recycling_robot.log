@@ -277,3 +277,289 @@
 2025-08-12 15:35:06,447 - src.services.inference_service - INFO - Inference service stopped
 2025-08-12 15:35:06,447 - __main__ - INFO - Shutting down...
 2025-08-12 15:35:06,448 - __main__ - INFO - ✓ Shutdown complete
+2025-08-12 15:46:35,903 - __main__ - INFO - Testing module imports...
+2025-08-12 15:46:35,906 - __main__ - INFO - ✓ Core modules
+2025-08-12 15:46:35,908 - __main__ - INFO - ✓ Service modules
+2025-08-12 15:46:35,909 - __main__ - INFO - ✓ Web modules
+2025-08-12 15:46:35,909 - __main__ - INFO - ✓ All imports successful
+2025-08-12 15:46:35,909 - __main__ - INFO - Model: models/recycler.pth
+2025-08-12 15:46:35,910 - __main__ - INFO - Camera: auto @ (640, 480)
+2025-08-12 15:46:35,910 - __main__ - INFO - Inference rate: 5.0 Hz
+2025-08-12 15:46:35,910 - __main__ - INFO - Initializing inference service...
+2025-08-12 15:46:35,910 - src.core.classifier - INFO - Initializing classifier on device: cpu
+2025-08-12 15:46:36,164 - src.core.classifier - INFO - Loaded model from state dict
+2025-08-12 15:46:36,171 - src.core.classifier - INFO - Classifier initialized successfully
+2025-08-12 15:46:36,171 - __main__ - INFO - ✓ All components initialized
+2025-08-12 15:46:36,484 - picamera2.picamera2 - INFO - Initialization successful.
+2025-08-12 15:46:36,484 - picamera2.picamera2 - INFO - Camera now open.
+2025-08-12 15:46:36,486 - picamera2.picamera2 - INFO - Camera configuration has been adjusted!
+2025-08-12 15:46:36,487 - picamera2.picamera2 - INFO - Configuration successful!
+2025-08-12 15:46:36,500 - picamera2.picamera2 - INFO - Camera started
+2025-08-12 15:46:37,001 - src.core.camera - INFO - Pi camera started with resolution (640, 480)
+2025-08-12 15:46:37,001 - src.services.inference_service - INFO - Inference service started at 5.0 Hz
+2025-08-12 15:46:37,001 - __main__ - INFO - Starting inference service...
+2025-08-12 15:46:37,002 - __main__ - INFO - 🌐 Starting web dashboard on 0.0.0.0:8000
+2025-08-12 15:46:37,008 - src.web.api - INFO - Starting web API on 0.0.0.0:8000
+2025-08-12 15:46:37,023 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8000
+ * Running on http://192.168.1.106:8000
+2025-08-12 15:46:37,024 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-12 15:46:38,737 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:38] "GET / HTTP/1.1" 200 -
+2025-08-12 15:46:38,804 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:38] "GET /api/video/stream.mjpeg HTTP/1.1" 200 -
+2025-08-12 15:46:38,836 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:38] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:39,797 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:39] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:40,799 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:40] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:41,787 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:41] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:42,794 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:42] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:43,785 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:43] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:44,782 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:44] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:45,783 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:45] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:46,783 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:46] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:48,010 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:48] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:48,788 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:48] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:49,830 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:49] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:50,832 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:50] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:51,837 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:51] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:52,789 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:52] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:53,778 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:53] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:54,776 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:54] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:55,782 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:55] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:56,780 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:56] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:57,782 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:57] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:58,798 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:58] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:46:59,878 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:46:59] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:00,796 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:00] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:01,830 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:01] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:02,786 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:02] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:03,837 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:03] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:04,836 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:04] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:05,838 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:05] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:06,789 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:06] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:07,849 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:07] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:08,786 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:08] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:09,784 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:09] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:10,789 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:10] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:11,781 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:11] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:12,795 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:12] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:13,835 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:13] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:14,782 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:14] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:15,784 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:15] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:16,789 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:16] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:17,795 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:17] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:18,791 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:18] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:19,791 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:19] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:20,798 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:20] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:21,788 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:21] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:22,804 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:22] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:23,787 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:23] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:24,779 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:24] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:25,787 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:25] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:26,778 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:26] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:27,775 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:27] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:28,786 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:28] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:29,777 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:29] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:30,789 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:30] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:31,789 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:31] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:32,785 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:32] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:33,851 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:33] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:34,796 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:34] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:35,778 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:35] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:36,775 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:36] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:37,803 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:37] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:38,787 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:38] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:39,823 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:39] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:40,772 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:40] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:41,770 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 15:47:41] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 15:47:42,378 - picamera2.picamera2 - INFO - Camera stopped
+2025-08-12 15:47:42,781 - picamera2.picamera2 - INFO - Camera closed successfully.
+2025-08-12 15:47:42,782 - src.core.camera - INFO - Pi camera stopped
+2025-08-12 15:47:42,782 - src.services.inference_service - INFO - Inference service stopped
+2025-08-12 15:47:42,782 - __main__ - INFO - Shutting down...
+2025-08-12 15:47:42,782 - __main__ - INFO - ✓ Shutdown complete
+2025-08-12 21:23:56,196 - __main__ - INFO - Testing module imports...
+2025-08-12 21:23:56,199 - __main__ - INFO - ✓ Core modules
+2025-08-12 21:23:56,200 - __main__ - INFO - ✓ Service modules
+2025-08-12 21:23:56,202 - __main__ - INFO - ✓ Web modules
+2025-08-12 21:23:56,202 - __main__ - INFO - ✓ All imports successful
+2025-08-12 21:23:56,202 - __main__ - INFO - Model: models/recycler.pth
+2025-08-12 21:23:56,202 - __main__ - INFO - Camera: auto @ (640, 480)
+2025-08-12 21:23:56,203 - __main__ - INFO - Inference rate: 5.0 Hz
+2025-08-12 21:23:56,203 - __main__ - INFO - Initializing inference service...
+2025-08-12 21:23:56,203 - src.core.classifier - INFO - Initializing classifier on device: cpu
+2025-08-12 21:23:56,456 - src.core.classifier - INFO - Loaded model from state dict
+2025-08-12 21:23:56,463 - src.core.classifier - INFO - Classifier initialized successfully
+2025-08-12 21:23:56,464 - __main__ - INFO - ✓ All components initialized
+2025-08-12 21:23:56,771 - picamera2.picamera2 - INFO - Initialization successful.
+2025-08-12 21:23:56,772 - picamera2.picamera2 - INFO - Camera now open.
+2025-08-12 21:23:56,774 - picamera2.picamera2 - INFO - Camera configuration has been adjusted!
+2025-08-12 21:23:56,775 - picamera2.picamera2 - INFO - Configuration successful!
+2025-08-12 21:23:56,786 - picamera2.picamera2 - INFO - Camera started
+2025-08-12 21:23:57,286 - src.core.camera - INFO - Pi camera started with resolution (640, 480)
+2025-08-12 21:23:57,287 - src.services.inference_service - INFO - Inference service started at 5.0 Hz
+2025-08-12 21:23:57,287 - __main__ - INFO - Starting inference service...
+2025-08-12 21:23:57,287 - __main__ - INFO - 🌐 Starting web dashboard on 0.0.0.0:8000
+2025-08-12 21:23:57,292 - src.web.api - INFO - Starting web API on 0.0.0.0:8000
+2025-08-12 21:23:57,307 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8000
+ * Running on http://192.168.1.106:8000
+2025-08-12 21:23:57,307 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-12 21:23:58,885 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:23:58] "GET / HTTP/1.1" 200 -
+2025-08-12 21:23:58,988 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:23:58] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:23:58,994 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:23:58] "GET /api/video/stream.mjpeg HTTP/1.1" 200 -
+2025-08-12 21:23:59,984 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:23:59] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:00,988 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:00] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:01,983 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:01] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:03,042 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:03] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:03,980 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:03] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:04,990 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:04] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:05,985 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:05] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:07,076 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:07] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:08,048 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:08] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:08,982 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:08] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:09,994 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:09] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:10,988 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:10] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:11,992 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:11] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:12,988 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:12] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:13,985 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:13] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:14,988 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:14] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:15,970 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:15] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:16,973 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:16] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:17,978 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:17] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:19,004 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:19] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:19,968 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:19] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:20,992 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:20] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:21,974 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:21] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:23,045 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:23] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:23,978 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:23] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:25,032 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:25] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:26,064 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:26] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:27,000 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:27] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:28,009 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:28] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:29,005 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:29] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:29,981 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:29] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:31,020 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:31] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:31,515 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:31] "GET / HTTP/1.1" 200 -
+2025-08-12 21:24:31,595 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:31] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:31,732 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:31] "GET /api/video/stream.mjpeg HTTP/1.1" 200 -
+2025-08-12 21:24:32,571 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:32] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:33,575 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:33] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:34,582 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:34] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:35,614 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:35] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:36,572 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:36] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:37,578 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:37] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:38,570 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:38] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:39,571 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:39] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:40,700 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:40] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:41,581 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:41] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:42,589 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:42] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:43,613 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:43] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:44,559 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:44] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:45,574 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:45] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:46,558 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:46] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:47,571 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:47] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:48,662 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:48] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:49,597 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:49] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:49,735 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:49] "GET / HTTP/1.1" 200 -
+2025-08-12 21:24:49,816 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:49] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:50,058 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:50] "GET /api/video/stream.mjpeg HTTP/1.1" 200 -
+2025-08-12 21:24:50,800 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:50] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:51,806 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:51] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:52,797 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:52] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:53,798 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:53] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:54,801 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:54] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:55,805 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:55] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:56,799 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:56] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:57,791 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:57] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:58,794 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:58] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:24:59,783 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:24:59] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:00,844 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:00] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:01,836 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:01] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:02,845 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:02] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:03,799 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:03] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:04,792 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:04] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:05,840 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:05] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:06,792 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:06] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:07,832 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:07] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:08,798 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:08] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:09,791 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:09] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:10,803 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:10] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:11,784 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:11] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:12,835 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:12] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:13,802 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:13] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:14,796 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:14] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:15,830 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:15] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:16,797 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:16] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:17,803 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:17] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:18,797 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:18] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:19,798 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:19] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:20,807 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:20] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:21,786 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:21] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:22,791 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:22] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:23,790 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:23] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:24,795 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:24] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:25,786 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:25] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:26,786 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:26] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:27,898 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:27] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:28,904 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:28] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:29,890 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:29] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:30,950 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:30] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:31,896 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:31] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:32,899 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:32] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:33,898 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:33] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:34,899 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:34] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:35,941 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:35] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:36,889 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:36] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:37,933 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:37] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:38,902 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:38] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:39,948 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:39] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:40,941 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:40] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:41,901 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:41] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:42,947 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:42] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:43,942 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:43] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:44,918 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:44] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:45,958 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:45] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:46,890 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:46] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:47,890 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:47] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:48,940 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:48] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:49,888 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:49] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:50,934 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:50] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:51,884 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:51] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:52,943 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:52] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:53,891 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:53] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:54,937 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:54] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:55,937 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:55] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:56,887 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:56] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:57,887 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:57] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:58,895 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:58] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:25:59,956 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:25:59] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:00,947 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:00] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:01,886 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:01] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:02,889 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:02] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:03,939 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:03] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:04,934 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:04] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:05,938 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:05] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:06,937 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:06] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:07,887 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:07] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:08,887 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:08] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:09,890 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:09] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:10,935 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:10] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:11,919 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:11] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:12,931 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:12] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:13,939 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:13] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:14,896 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:14] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:15,998 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:15] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:16,913 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:16] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:17,940 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:17] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:18,954 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:18] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:19,976 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:19] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:20,955 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:20] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:21,893 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:21] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:22,904 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:22] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:23,903 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:23] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:24,929 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:24] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:25,959 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:25] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:26,915 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:26] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:26:27,904 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:26:27] "GET /api/stats HTTP/1.1" 200 -
+2025-08-12 21:27:27,959 - werkzeug - INFO - 127.0.0.1 - - [12/Aug/2025 21:27:27] "GET /api/stats HTTP/1.1" 200 -

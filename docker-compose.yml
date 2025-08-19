@@ -1,0 +1,10 @@
+services:
+  recycling-robot:
+    platform: linux/arm64     # force ARM64 image selection
+    build: .
+    volumes:
+      - .:/workspace
+      - /dev:/dev            # optionally narrow to specific devices later
+    privileged: true
+    network_mode: host
+    command: bash

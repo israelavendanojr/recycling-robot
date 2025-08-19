@@ -1,0 +1,9 @@
+venv/
+logs/
+__pycache__/
+*.pyc
+.git/
+models/*.pth
+.DS_Store
+*.mp4
+*.avi

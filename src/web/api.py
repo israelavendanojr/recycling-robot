@@ -292,7 +292,7 @@ DASHBOARD_HTML = '''
         <div class="dashboard-grid">
             <!-- Video Feed Section -->
             <div class="card video-container">
-                <h2>📹 Live Camera Feed</h2>
+                <h2>Live Camera Feed</h2>
                 <div class="status-indicator" title="System Online"></div>
                 <img 
                     src="/api/video/stream.mjpeg" 
