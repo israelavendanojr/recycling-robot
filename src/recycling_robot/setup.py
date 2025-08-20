@@ -12,23 +12,23 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # Include launch files
+        # Include launch files - fixed path
         (os.path.join('share', package_name, 'launch'),
-            glob(os.path.join('launch', '*launch.[pxy]'))),
-        # Include message definitions
+            glob('launch/*.launch.py')),
+        # Include message definitions - fixed path  
         (os.path.join('share', package_name, 'msg'),
-            glob(os.path.join('msg', '*.msg'))),
-        # Include service definitions
+            glob('msg/*.msg')),
+        # Include service definitions - fixed path
         (os.path.join('share', package_name, 'srv'),
-            glob(os.path.join('srv', '*.srv'))),
-        # Include action definitions
+            glob('srv/*.srv')),
+        # Include action definitions - fixed path
         (os.path.join('share', package_name, 'action'),
-            glob(os.path.join('action', '*.action'))),
+            glob('action/*.action')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Israel Avendano Jr',
-    maintainer_email='israelavendanojr@gmail.com',
+    maintainer='Recycling Robot Team',
+    maintainer_email='dev@recyclingbot.com',
     description='AI-powered recycling robot with computer vision classification and physical sorting',
     license='MIT',
     tests_require=['pytest'],
@@ -43,9 +43,6 @@ setup(
             'web_bridge_node = recycling_robot.nodes.web_bridge_node:main',
             'stats_monitor_node = recycling_robot.nodes.stats_monitor_node:main',
             'safety_node = recycling_robot.nodes.safety_node:main',
-            
-            # Utilities
-            'system_launcher = recycling_robot.launch.system_launcher:main',
         ],
     },
 )

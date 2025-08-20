@@ -1,1 +1,12 @@
 venv/
+
+# ROS 2 build artifacts
+build/
+install/
+log/
+
+# Python junk
+__pycache__/
+*.pyc
+*.pyo
+

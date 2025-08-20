@@ -7,3 +7,5 @@ models/*.pth
 .DS_Store
 *.mp4
 *.avi
+.pytest_cache/
+.ipynb_checkpoints/
