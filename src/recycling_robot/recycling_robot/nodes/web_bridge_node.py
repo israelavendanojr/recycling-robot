@@ -138,188 +138,172 @@ class WebBridgeNode(Node):
         """Setup Flask routes for web dashboard."""
         
         # Import the great dashboard HTML from legacy
-        DASHBOARD_HTML = '''
-<!DOCTYPE html>
+        DASHBOARD_HTML = """
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 ROS 2 Recycling Robot Dashboard</title>
-    <style>
-        body { font-family: system-ui; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 2rem; }
-        .header h1 { color: #2c3e50; font-size: 2.5rem; margin-bottom: 0.5rem; }
-        .header p { color: #666; font-size: 1.1rem; }
-        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-bottom: 2rem; }
-        .card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .card h2 { color: #2c3e50; margin-bottom: 1rem; }
-        .video-stream { width: 100%; border-radius: 8px; background: #eee; min-height: 300px; }
-        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-        .stat { text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; }
-        .stat-value { font-size: 2rem; font-weight: bold; color: #3498db; }
-        .stat-label { color: #666; text-transform: uppercase; font-size: 0.9rem; }
-        .prediction { text-align: center; padding: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; margin-bottom: 1rem; }
-        .prediction-class { font-size: 1.8rem; font-weight: bold; margin-bottom: 0.5rem; }
-        .confidence { font-size: 1.2rem; opacity: 0.9; }
-        .btn { background: #3498db; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; margin: 0.5rem; }
-        .btn:hover { background: #2980b9; }
-        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px; }
-        .status-online { background: #27ae60; color: white; }
-        .status-offline { background: #e74c3c; color: white; }
-        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-    </style>
+  <meta charset="utf-8">
+  <title>Recycling Robot Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --bg:#fff; --muted:#f4f5f7; --text:#1f2937; --sub:#6b7280; --line:#e5e7eb; --accent:#2563eb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); }
+    header { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+    header h1 { margin: 0; font-size: 18px; }
+    header .meta { margin-top: 4px; color: var(--sub); font-size: 13px; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+    .card .hd { padding: 12px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+    .card .bd { padding: 14px; }
+    .video { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--muted); border-radius: 6px; }
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat { border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
+    .stat .label { color: var(--sub); font-size: 12px; }
+    .stat .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+    .row { display: flex; gap: 10px; align-items: center; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid var(--line); }
+    .ok { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
+    .bad { color: #7f1d1d; background: #fef2f2; border-color: #fecaca; }
+    .controls { display: flex; gap: 8px; }
+    button, .link { cursor: pointer; border: 1px solid var(--line); background: #fff; padding: 8px 10px; border-radius: 6px; font: inherit; }
+    button:hover, .link:hover { border-color: var(--accent); }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>🤖 ROS 2 Recycling Robot</h1>
-            <p>Real-time AI-powered waste classification system</p>
-            <div id="ros-status" class="status-badge status-offline">ROS Status: Checking...</div>
-        </header>
+  <header>
+    <h1>Recycling Robot</h1>
+    <div class="meta">
+      Minimal ROS 2 dashboard · <span id="ros-status" class="badge">checking…</span>
+    </div>
+  </header>
 
-        <div class="grid">
-            <div class="card">
-                <h2>📹 Live Camera Feed</h2>
-                <img id="video-stream" class="video-stream" alt="Camera feed loading..." 
-                     onerror="this.alt='Camera feed unavailable';">
-            </div>
-
-            <div class="card">
-                <h2>📊 Classification Results</h2>
-                
-                <div class="prediction">
-                    <div id="prediction-class" class="prediction-class">Loading...</div>
-                    <div id="confidence-display" class="confidence">Confidence: ---%</div>
-                </div>
-
-                <div class="stats">
-                    <div class="stat">
-                        <div id="fps-value" class="stat-value">--</div>
-                        <div class="stat-label">FPS</div>
-                    </div>
-                    <div class="stat">
-                        <div id="total-count" class="stat-value">--</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                </div>
-
-                <h3>Class Counts</h3>
-                <div id="class-counts">Loading...</div>
-            </div>
+  <div class="wrap">
+    <div class="grid">
+      <section class="card">
+        <div class="hd">Camera</div>
+        <div class="bd">
+          <img id="video" class="video" alt="camera stream" />
         </div>
+      </section>
 
-        <div class="card">
-            <h2>⚙️ System Status</h2>
-            <div class="stats">
-                <div class="stat">
-                    <div id="uptime-value" class="stat-value">--</div>
-                    <div class="stat-label">Uptime</div>
-                </div>
-                <div class="stat">
-                    <div id="node-count" class="stat-value">--</div>
-                    <div class="stat-label">ROS Nodes</div>
-                </div>
+      <section class="card">
+        <div class="hd">Prediction</div>
+        <div class="bd">
+          <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
+            <div>
+              <div class="label" style="color:var(--sub); font-size:12px;">Class</div>
+              <div id="pred-class" style="font-weight:600; font-size:18px;">—</div>
             </div>
-        </div>
+            <div>
+              <div class="label" style="color:var(--sub); font-size:12px;">Confidence</div>
+              <div id="pred-conf" style="font-weight:600; font-size:18px;">—</div>
+            </div>
+          </div>
 
-        <div style="text-align: center; margin-top: 2rem;">
-            <button class="btn" onclick="refreshData()">🔄 Refresh</button>
-            <button class="btn" onclick="resetStats()">🗑️ Reset Stats</button>
-            <a href="/health" class="btn">⚕️ Health Check</a>
+          <div class="stats" style="margin-top: 6px;">
+            <div class="stat">
+              <div class="label">FPS</div>
+              <div id="fps" class="value">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total classified</div>
+              <div id="total" class="value">—</div>
+            </div>
+          </div>
         </div>
+      </section>
     </div>
 
-    <script>
-        let updateInterval;
+    <section class="card" style="margin-top:20px;">
+      <div class="hd">Class counts</div>
+      <div class="bd">
+        <table id="counts-table">
+          <thead><tr><th>Class</th><th>Count</th></tr></thead>
+          <tbody><tr><td colspan="2">No data</td></tr></tbody>
+        </table>
+      </div>
+    </section>
 
-        async function updateDashboard() {
-            try {
-                const response = await fetch('/api/stats');
-                const data = await response.json();
-                
-                // Update ROS status
-                const statusEl = document.getElementById('ros-status');
-                if (data.ros_ok) {
-                    statusEl.textContent = 'ROS Status: Online';
-                    statusEl.className = 'status-badge status-online';
-                } else {
-                    statusEl.textContent = 'ROS Status: Offline';
-                    statusEl.className = 'status-badge status-offline';
-                }
-                
-                // Update prediction
-                document.getElementById('prediction-class').textContent = 
-                    data.current_prediction || 'No Detection';
-                
-                const confidence = (data.confidence || 0) * 100;
-                document.getElementById('confidence-display').textContent = 
-                    `Confidence: ${confidence.toFixed(1)}%`;
-                
-                // Update performance
-                document.getElementById('fps-value').textContent = data.fps || '--';
-                document.getElementById('total-count').textContent = data.total_classifications || '--';
-                
-                // Update uptime
-                const uptime = data.uptime_seconds || 0;
-                const hours = Math.floor(uptime / 3600);
-                const minutes = Math.floor((uptime % 3600) / 60);
-                document.getElementById('uptime-value').textContent = 
-                    `${hours}:${minutes.toString().padStart(2, '0')}`;
-                
-                document.getElementById('node-count').textContent = data.active_nodes || '--';
-                
-                // Update class counts
-                const counts = data.class_counts || {};
-                const countsHtml = Object.entries(counts)
-                    .map(([cls, cnt]) => `<div style="margin:4px 0;">${cls}: ${cnt}</div>`)
-                    .join('') || '<div>No classifications yet</div>';
-                document.getElementById('class-counts').innerHTML = countsHtml;
-                
-            } catch (error) {
-                console.error('Error updating dashboard:', error);
-                document.getElementById('ros-status').textContent = 'ROS Status: Error';
-                document.getElementById('ros-status').className = 'status-badge status-offline';
-            }
-        }
+    <section class="card" style="margin-top:20px;">
+      <div class="hd">System</div>
+      <div class="bd row" style="justify-content: space-between;">
+        <div class="row" style="gap:20px;">
+          <div><span class="label">Uptime</span><div id="uptime" class="value" style="font-size:16px;">—</div></div>
+          <div><span class="label">Nodes</span><div id="nodes" class="value" style="font-size:16px;">—</div></div>
+        </div>
+        <div class="controls">
+          <button id="refresh">Refresh</button>
+          <button id="reset">Reset stats</button>
+          <a class="link" href="/health">Health</a>
+        </div>
+      </div>
+    </section>
+  </div>
 
-        async function refreshData() {
-            await updateDashboard();
-        }
+  <script>
+    function setBadge(ok) {
+      const el = document.getElementById('ros-status');
+      el.textContent = ok ? 'online' : 'offline';
+      el.className = 'badge ' + (ok ? 'ok' : 'bad');
+    }
 
-        async function resetStats() {
-            if (!confirm('Reset all statistics?')) return;
-            try {
-                const response = await fetch('/api/stats/reset', { method: 'POST' });
-                if (response.ok) {
-                    await updateDashboard();
-                    alert('Statistics reset!');
-                } else {
-                    alert('Failed to reset statistics');
-                }
-            } catch (error) {
-                alert('Error resetting statistics');
-            }
-        }
+    function pad(n){return n.toString().padStart(2,'0');}
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set video source if enabled
-            const videoEl = document.getElementById('video-stream');
-            videoEl.src = '/api/video/stream.mjpeg';
-            
-            // Start updates
-            updateDashboard();
-            updateInterval = setInterval(updateDashboard, 2000); // 2 second updates
-        });
+    async function loadStats() {
+      try {
+        const r = await fetch('/api/stats');
+        const d = await r.json();
 
-        window.addEventListener('beforeunload', function() {
-            if (updateInterval) clearInterval(updateInterval);
-        });
-    </script>
+        setBadge(!!d.ros_ok);
+
+        document.getElementById('pred-class').textContent = d.current_prediction || '—';
+        document.getElementById('pred-conf').textContent  = d.confidence != null ? (d.confidence*100).toFixed(1)+'%' : '—';
+        document.getElementById('fps').textContent        = d.fps != null ? d.fps : '—';
+        document.getElementById('total').textContent      = d.total_classifications != null ? d.total_classifications : '—';
+
+        const up = Math.max(0, Math.floor(d.uptime_seconds || 0));
+        const h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+        document.getElementById('uptime').textContent = h + ':' + pad(m);
+
+        document.getElementById('nodes').textContent = d.active_nodes != null ? d.active_nodes : '—';
+
+        const tbody = document.querySelector('#counts-table tbody');
+        const counts = d.class_counts || {};
+        const entries = Object.entries(counts);
+        tbody.innerHTML = entries.length
+          ? entries.map(([k,v]) => '<tr><td>'+k+'</td><td>'+v+'</td></tr>').join('')
+          : '<tr><td colspan="2">No data</td></tr>';
+      } catch (e) {
+        setBadge(false);
+      }
+    }
+
+    async function resetStats() {
+      if (!confirm('Reset all statistics?')) return;
+      try {
+        const r = await fetch('/api/stats/reset', { method: 'POST' });
+        if (r.ok) loadStats();
+      } catch {}
+    }
+
+    // wire up
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('video').src = '/api/video/stream.mjpeg';
+      document.getElementById('refresh').addEventListener('click', loadStats);
+      document.getElementById('reset').addEventListener('click', resetStats);
+      loadStats();
+      setInterval(loadStats, 2000);
+    });
+  </script>
 </body>
 </html>
-        '''
+"""
+
         
         @self.app.route('/')
         def dashboard():
