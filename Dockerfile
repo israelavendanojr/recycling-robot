@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-std-msgs \
     ros-humble-geometry-msgs \
     ros-humble-rclpy \
+    ros-humble-web-video-server \
+    ros-humble-rosbridge-server \
+    ros-humble-action-msgs \
     python3-colcon-common-extensions \
  && rm -rf /var/lib/apt/lists/*
 
@@ -23,4 +26,5 @@ COPY . /workspace/
 # Set up ROS2 environment with proper configuration
 RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
     echo "export ROS_DOMAIN_ID=0" >> /root/.bashrc && \
-    echo "export ROS_LOCALHOST_ONLY=1" >> /root/.bashrc
+    echo "export ROS_LOCALHOST_ONLY=1" >> /root/.bashrc && \
+    echo "export ROS_WS=/workspace" >> /root/.bashrc
