@@ -12,22 +12,21 @@ import numpy as np
 from typing import Optional
 import time
 import os
+import sys
 
-# Import custom messages - for now we'll use basic types until messages are built
+# Import custom messages - fallback for development
 try:
     from recycling_robot_msgs.msg import ClassificationResult as ClassificationResultMsg
     from recycling_robot_msgs.srv import ClassifyImage
     CUSTOM_MSGS_AVAILABLE = True
 except ImportError:
-    # Fallback for development - use basic ROS messages
     from std_msgs.msg import String as ClassificationResultMsg
     from std_srvs.srv import Trigger as ClassifyImage
     CUSTOM_MSGS_AVAILABLE = False
 
-# Import our classifier from legacy
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'legacy'))
-from recycling_robot.utils.classifier import RecyclingClassifier
+# Import our classifier - fix the circular import by using proper path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
+from classifier import RecyclingClassifier
 
 class ClassifierNode(Node):
     """
@@ -166,6 +165,11 @@ class ClassifierNode(Node):
             response.success = True
             response.message = f'Mock classification: {result.predicted_class} ({result.confidence*100:.1f}%)'
             
+            # Publish result for web dashboard
+            msg = ClassificationResultMsg()
+            msg.data = f"{result.predicted_class}:{result.confidence:.3f}"
+            self.result_publisher.publish(msg)
+            
             # Log statistics periodically
             if self.classification_count % 5 == 0:
                 avg_time = self.total_inference_time / self.classification_count
@@ -206,7 +210,7 @@ class ClassifierNode(Node):
                 
                 # Perform real classification
                 start_time = time.time()
-                result = self.classifier.classify(frame)
+                result = self.classifier.predict(frame)  # Use predict() method
                 classification_time = (time.time() - start_time) * 1000
             
             # Update statistics

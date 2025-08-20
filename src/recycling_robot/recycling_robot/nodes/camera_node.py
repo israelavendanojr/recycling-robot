@@ -12,12 +12,12 @@ import numpy as np
 from typing import Optional
 import threading
 import time
-
-# Import our camera hardware abstraction from legacy
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'legacy'))
-from recycling_robot.utils.camera import CameraManager
+
+# Import our camera hardware abstraction - fix the import path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
+from camera import CameraManager
 
 class CameraNode(Node):
     """
@@ -63,7 +63,8 @@ class CameraNode(Node):
         try:
             self.camera_manager = CameraManager(
                 camera_type=camera_type,
-                resolution=self.resolution
+                resolution=self.resolution,
+                fps=fps
             )
             self.camera_manager.start()
             self.get_logger().info('✓ Camera initialized successfully')
@@ -154,7 +155,7 @@ class CameraNode(Node):
         
         # Stop camera
         if self.camera_manager:
-            self.camera_manager.stop()
+            self.camera_manager.release()
         
         # Print final statistics
         if self.frame_count > 0:

@@ -161,18 +161,29 @@ class RecyclingClassifier:
         # Mock path
         return self._mock_predict(bgr)
 
+    # Alias for backwards compatibility
+    def classify(self, bgr: np.ndarray) -> ClassificationResult:
+        return self.predict(bgr)
+
     # ----------- mock -----------
 
     def _mock_predict(self, bgr: np.ndarray) -> ClassificationResult:
         # Deterministic "fake" result based on mean pixel value
-        mean_val = float(bgr.mean())
+        mean_val = float(bgr.mean()) if bgr is not None else 128.0
         idx = int(mean_val) % len(self.class_names)
         probs = np.zeros(len(self.class_names), dtype=np.float32)
-        probs[idx] = 1.0
+        probs[idx] = 0.85  # Make it look realistic
+        # Add some noise to other classes
+        for i in range(len(self.class_names)):
+            if i != idx:
+                probs[i] = np.random.uniform(0.01, 0.1)
+        # Normalize
+        probs = probs / probs.sum()
+        
         return ClassificationResult(
             predicted_class=self.class_names[idx],
             class_index=idx,
-            confidence=1.0,
+            confidence=float(probs[idx]),
             all_probabilities={c: float(p) for c, p in zip(self.class_names, probs)},
             timestamp=time.time(),
         )

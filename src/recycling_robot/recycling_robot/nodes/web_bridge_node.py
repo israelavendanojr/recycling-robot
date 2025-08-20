@@ -1,6 +1,6 @@
 """
 ROS2 Web Bridge Node - HTTP API bridge for dashboard.
-Migrated from legacy/web/api.py with ROS 2 topic subscriptions.
+Enhanced version with automatic classification triggering.
 """
 
 import rclpy
@@ -29,7 +29,7 @@ except ImportError:
 class WebBridgeNode(Node):
     """
     ROS2 node that bridges ROS topics to HTTP API for web dashboard.
-    Provides the same great dashboard from legacy code with ROS 2 backend.
+    Enhanced with automatic classification triggering for better demo experience.
     """
     
     def __init__(self):
@@ -39,11 +39,13 @@ class WebBridgeNode(Node):
         self.declare_parameter('host', '0.0.0.0')
         self.declare_parameter('port', 8000)
         self.declare_parameter('enable_video_stream', True)
+        self.declare_parameter('auto_classify_interval', 3.0)  # Classify every 3 seconds
         
         # Get parameters
         self.host = self.get_parameter('host').get_parameter_value().string_value
         self.port = self.get_parameter('port').get_parameter_value().integer_value
         self.enable_video = self.get_parameter('enable_video_stream').get_parameter_value().bool_value
+        self.auto_classify_interval = self.get_parameter('auto_classify_interval').get_parameter_value().double_value
         
         # Initialize components
         self.bridge = CvBridge()
@@ -55,6 +57,7 @@ class WebBridgeNode(Node):
         self.classification_counts = Counter()
         self.frame_times = deque(maxlen=60)
         self.start_time = time.time()
+        self.last_auto_classify = 0.0
         
         # ROS subscriptions
         self.image_subscription = self.create_subscription(
@@ -74,6 +77,12 @@ class WebBridgeNode(Node):
         # Service client for on-demand classification
         self.classify_client = self.create_client(ClassifyImage, '/classify_image')
         
+        # Auto-classification timer
+        self.auto_classify_timer = self.create_timer(
+            self.auto_classify_interval,
+            self.auto_classify_callback
+        )
+        
         # Flask app setup
         self.app = Flask(__name__)
         self._setup_flask_routes()
@@ -88,6 +97,7 @@ class WebBridgeNode(Node):
         
         self.get_logger().info(f'✓ Web bridge started at http://{self.host}:{self.port}')
         self.get_logger().info('Dashboard available at: http://localhost:8000/')
+        self.get_logger().info(f'Auto-classification enabled (every {self.auto_classify_interval}s)')
     
     def image_callback(self, msg: Image) -> None:
         """Handle incoming camera images."""
@@ -134,10 +144,34 @@ class WebBridgeNode(Node):
         except Exception as e:
             self.get_logger().error(f'Error processing classification: {e}')
     
+    def auto_classify_callback(self) -> None:
+        """Automatically trigger classification for demo purposes."""
+        if not self.classify_client.service_is_ready():
+            return
+            
+        with self._lock:
+            if self.latest_image is None:
+                return
+            
+            # Convert to ROS image
+            ros_image = self.bridge.cv2_to_imgmsg(self.latest_image, encoding='rgb8')
+        
+        # Call classification service asynchronously
+        try:
+            request = ClassifyImage.Request()
+            if CUSTOM_MSGS_AVAILABLE:
+                request.image = ros_image
+                
+            future = self.classify_client.call_async(request)
+            # Don't block - just fire and forget for auto classification
+            
+        except Exception as e:
+            self.get_logger().debug(f'Auto-classification failed: {e}')
+    
     def _setup_flask_routes(self) -> None:
         """Setup Flask routes for web dashboard."""
         
-        # Import the great dashboard HTML from legacy
+        # Import the great dashboard HTML from legacy with enhancements
         DASHBOARD_HTML = """
 <!doctype html>
 <html lang="en">
@@ -171,33 +205,42 @@ class WebBridgeNode(Node):
     .controls { display: flex; gap: 8px; }
     button, .link { cursor: pointer; border: 1px solid var(--line); background: #fff; padding: 8px 10px; border-radius: 6px; font: inherit; }
     button:hover, .link:hover { border-color: var(--accent); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .classify-btn { background: var(--accent); color: white; border-color: var(--accent); }
+    .classify-btn:hover:not(:disabled) { background: #1d4ed8; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>Recycling Robot</h1>
+    <h1>🤖 Recycling Robot</h1>
     <div class="meta">
-      Minimal ROS 2 dashboard · <span id="ros-status" class="badge">checking…</span>
+      Enhanced ROS 2 dashboard · <span id="ros-status" class="badge">checking…</span>
     </div>
   </header>
 
   <div class="wrap">
     <div class="grid">
       <section class="card">
-        <div class="hd">Camera</div>
+        <div class="hd">Camera Feed</div>
         <div class="bd">
           <img id="video" class="video" alt="camera stream" />
+          <div style="margin-top: 12px;">
+            <button id="classify-now" class="classify-btn">Classify Now</button>
+            <small style="color: var(--sub); margin-left: 10px;">
+              Auto-classification every 3 seconds
+            </small>
+          </div>
         </div>
       </section>
 
       <section class="card">
-        <div class="hd">Prediction</div>
+        <div class="hd">Current Prediction</div>
         <div class="bd">
           <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
             <div>
               <div class="label" style="color:var(--sub); font-size:12px;">Class</div>
-              <div id="pred-class" style="font-weight:600; font-size:18px;">—</div>
+              <div id="pred-class" style="font-weight:600; font-size:18px; color: var(--accent);">—</div>
             </div>
             <div>
               <div class="label" style="color:var(--sub); font-size:12px;">Confidence</div>
@@ -205,13 +248,13 @@ class WebBridgeNode(Node):
             </div>
           </div>
 
-          <div class="stats" style="margin-top: 6px;">
+          <div class="stats" style="margin-top: 16px;">
             <div class="stat">
-              <div class="label">FPS</div>
+              <div class="label">Camera FPS</div>
               <div id="fps" class="value">—</div>
             </div>
             <div class="stat">
-              <div class="label">Total classified</div>
+              <div class="label">Classifications</div>
               <div id="total" class="value">—</div>
             </div>
           </div>
@@ -220,17 +263,17 @@ class WebBridgeNode(Node):
     </div>
 
     <section class="card" style="margin-top:20px;">
-      <div class="hd">Class counts</div>
+      <div class="hd">Classification History</div>
       <div class="bd">
         <table id="counts-table">
-          <thead><tr><th>Class</th><th>Count</th></tr></thead>
-          <tbody><tr><td colspan="2">No data</td></tr></tbody>
+          <thead><tr><th>Material</th><th>Count</th><th>%</th></tr></thead>
+          <tbody><tr><td colspan="3" style="text-align: center; color: var(--sub);">No classifications yet</td></tr></tbody>
         </table>
       </div>
     </section>
 
     <section class="card" style="margin-top:20px;">
-      <div class="hd">System</div>
+      <div class="hd">System Status</div>
       <div class="bd row" style="justify-content: space-between;">
         <div class="row" style="gap:20px;">
           <div><span class="label">Uptime</span><div id="uptime" class="value" style="font-size:16px;">—</div></div>
@@ -238,7 +281,7 @@ class WebBridgeNode(Node):
         </div>
         <div class="controls">
           <button id="refresh">Refresh</button>
-          <button id="reset">Reset stats</button>
+          <button id="reset">Reset Stats</button>
           <a class="link" href="/health">Health</a>
         </div>
       </div>
@@ -246,6 +289,8 @@ class WebBridgeNode(Node):
   </div>
 
   <script>
+    let isClassifying = false;
+
     function setBadge(ok) {
       const el = document.getElementById('ros-status');
       el.textContent = ok ? 'online' : 'offline';
@@ -263,7 +308,7 @@ class WebBridgeNode(Node):
 
         document.getElementById('pred-class').textContent = d.current_prediction || '—';
         document.getElementById('pred-conf').textContent  = d.confidence != null ? (d.confidence*100).toFixed(1)+'%' : '—';
-        document.getElementById('fps').textContent        = d.fps != null ? d.fps : '—';
+        document.getElementById('fps').textContent        = d.fps != null ? d.fps.toFixed(1) : '—';
         document.getElementById('total').textContent      = d.total_classifications != null ? d.total_classifications : '—';
 
         const up = Math.max(0, Math.floor(d.uptime_seconds || 0));
@@ -275,27 +320,63 @@ class WebBridgeNode(Node):
         const tbody = document.querySelector('#counts-table tbody');
         const counts = d.class_counts || {};
         const entries = Object.entries(counts);
+        const total = entries.reduce((sum, [,v]) => sum + v, 0);
+        
         tbody.innerHTML = entries.length
-          ? entries.map(([k,v]) => '<tr><td>'+k+'</td><td>'+v+'</td></tr>').join('')
-          : '<tr><td colspan="2">No data</td></tr>';
+          ? entries.sort((a,b) => b[1] - a[1]).map(([k,v]) => {
+              const pct = total > 0 ? ((v/total)*100).toFixed(1) + '%' : '0%';
+              return `<tr><td>${k}</td><td>${v}</td><td>${pct}</td></tr>`;
+            }).join('')
+          : '<tr><td colspan="3" style="text-align: center; color: var(--sub);">No classifications yet</td></tr>';
       } catch (e) {
         setBadge(false);
       }
     }
 
+    async function classifyNow() {
+      if (isClassifying) return;
+      
+      isClassifying = true;
+      const btn = document.getElementById('classify-now');
+      btn.disabled = true;
+      btn.textContent = 'Classifying...';
+      
+      try {
+        const r = await fetch('/api/classify', { method: 'POST' });
+        const result = await r.json();
+        
+        if (!result.success) {
+          console.error('Classification failed:', result.error);
+        }
+        
+        // Refresh stats to show new result
+        setTimeout(loadStats, 500);
+        
+      } catch (e) {
+        console.error('Classification request failed:', e);
+      } finally {
+        isClassifying = false;
+        btn.disabled = false;
+        btn.textContent = 'Classify Now';
+      }
+    }
+
     async function resetStats() {
-      if (!confirm('Reset all statistics?')) return;
+      if (!confirm('Reset all classification statistics?')) return;
       try {
         const r = await fetch('/api/stats/reset', { method: 'POST' });
         if (r.ok) loadStats();
       } catch {}
     }
 
-    // wire up
+    // Wire up event handlers
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('video').src = '/api/video/stream.mjpeg';
       document.getElementById('refresh').addEventListener('click', loadStats);
       document.getElementById('reset').addEventListener('click', resetStats);
+      document.getElementById('classify-now').addEventListener('click', classifyNow);
+      
+      // Initial load and periodic updates
       loadStats();
       setInterval(loadStats, 2000);
     });
@@ -317,6 +398,8 @@ class WebBridgeNode(Node):
                 "status": "healthy",
                 "node_name": self.get_name(),
                 "ros_ok": rclpy.ok(),
+                "camera_active": self.latest_image is not None,
+                "classification_service": self.classify_client.service_is_ready(),
                 "timestamp": time.time()
             })
         
@@ -349,7 +432,9 @@ class WebBridgeNode(Node):
                     "class_counts": dict(self.classification_counts),
                     "uptime_seconds": uptime,
                     "ros_ok": rclpy.ok(),
-                    "active_nodes": 3,  # Mock for now
+                    "active_nodes": 3,  # camera, classifier, web_bridge
+                    "camera_active": self.latest_image is not None,
+                    "classification_service_ready": self.classify_client.service_is_ready(),
                     "timestamp": time.time()
                 })
         
@@ -361,6 +446,7 @@ class WebBridgeNode(Node):
                 self.frame_times.clear()
                 self.start_time = time.time()
             
+            self.get_logger().info('Statistics reset via web dashboard')
             return jsonify({"message": "Statistics reset successfully"})
         
         @self.app.route('/api/video/stream.mjpeg')
@@ -394,11 +480,12 @@ class WebBridgeNode(Node):
                     request.image = ros_image
                     
                 future = self.classify_client.call_async(request)
-                # Note: In production, this should be async to avoid blocking Flask
-                rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
+                # Use a short timeout to avoid blocking the web request too long
+                rclpy.spin_until_future_complete(self, future, timeout_sec=3.0)
                 
                 if future.result() is not None:
                     response = future.result()
+                    self.get_logger().info('Manual classification triggered via web dashboard')
                     return jsonify({
                         "success": response.success,
                         "message": response.message
@@ -407,10 +494,11 @@ class WebBridgeNode(Node):
                     return jsonify({"error": "Classification service timeout"}), 408
                     
             except Exception as e:
+                self.get_logger().error(f'Manual classification failed: {e}')
                 return jsonify({"error": f"Classification failed: {e}"}), 500
     
     def _generate_video_stream(self):
-        """Generate MJPEG video stream."""
+        """Generate MJPEG video stream with enhanced overlays."""
         boundary = b'frame'
         
         while True:
@@ -420,7 +508,7 @@ class WebBridgeNode(Node):
                         # Generate placeholder image
                         frame = np.zeros((480, 640, 3), dtype=np.uint8)
                         cv2.putText(frame, "Waiting for camera...", (50, 240),
-                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (128, 128, 128), 2)
                     else:
                         frame = self.latest_image.copy()
                         
@@ -428,18 +516,47 @@ class WebBridgeNode(Node):
                         if self.latest_classification:
                             pred = self.latest_classification['predicted_class']
                             conf = self.latest_classification['confidence']
+                            age = time.time() - self.latest_classification['timestamp']
                             
-                            # Add text overlay
-                            text = f"{pred} ({conf*100:.1f}%)"
-                            cv2.putText(frame, text, (10, 30),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                            # Main prediction text
+                            text = f"{pred.upper()}"
+                            conf_text = f"{conf*100:.1f}%"
+                            
+                            # Add colored background for better readability
+                            (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
+                            (conf_w, conf_h), _ = cv2.getTextSize(conf_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+                            
+                            # Background rectangle
+                            cv2.rectangle(frame, (8, 8), (max(text_w, conf_w) + 20, text_h + conf_h + 20), 
+                                        (0, 0, 0), -1)
+                            cv2.rectangle(frame, (8, 8), (max(text_w, conf_w) + 20, text_h + conf_h + 20), 
+                                        (0, 255, 0) if conf > 0.7 else (0, 255, 255), 2)
+                            
+                            # Text overlays
+                            cv2.putText(frame, text, (15, 30),
+                                      cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                            cv2.putText(frame, conf_text, (15, 55),
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
+                            
+                            # Age indicator (fade if old)
+                            if age > 5:
+                                alpha = max(0.3, 1.0 - (age - 5) / 10)
+                                overlay = frame.copy()
+                                cv2.putText(overlay, "OLD", (15, 80),
+                                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+                                frame = cv2.addWeighted(frame, 1.0, overlay, alpha, 0)
+                        
+                        # Add timestamp
+                        timestamp = time.strftime("%H:%M:%S")
+                        cv2.putText(frame, timestamp, (frame.shape[1] - 100, 25),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
                 
                 # Convert RGB to BGR for OpenCV encoding
                 frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 
                 # Encode as JPEG
                 success, buffer = cv2.imencode('.jpg', frame_bgr, 
-                                             [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                                             [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 
                 if not success:
                     time.sleep(0.1)
