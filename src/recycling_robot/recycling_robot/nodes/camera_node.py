@@ -1,6 +1,6 @@
 """
-ROS2 Camera Node - Publishes camera images to /camera/image_raw topic.
-Migrated from legacy/core/camera.py with ROS 2 integration.
+ROS2 Camera Node - Enhanced with ArduCam support and better debugging.
+Publishes camera images to /camera/image_raw topic.
 """
 
 import rclpy
@@ -15,25 +15,26 @@ import time
 import sys
 import os
 
-# Import our camera hardware abstraction - fix the import path
+# Import our enhanced camera hardware abstraction
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 from camera import CameraManager
 
 class CameraNode(Node):
     """
     ROS2 node that publishes camera frames as sensor_msgs/Image messages.
-    Uses the proven camera abstraction from legacy code.
+    Enhanced with ArduCam support and better diagnostics.
     """
     
     def __init__(self):
         super().__init__('camera_node')
         
         # Declare parameters
-        self.declare_parameter('camera_type', 'mock')  # Start with mock for development
+        self.declare_parameter('camera_type', 'auto')  # auto, arducam, pi, usb, mock
         self.declare_parameter('resolution_width', 640)
         self.declare_parameter('resolution_height', 480)
         self.declare_parameter('fps', 10.0)
         self.declare_parameter('frame_id', 'camera_link')
+        self.declare_parameter('debug_mode', True)  # Extra logging for troubleshooting
         
         # Get parameters
         camera_type = self.get_parameter('camera_type').get_parameter_value().string_value
@@ -41,6 +42,7 @@ class CameraNode(Node):
         height = self.get_parameter('resolution_height').get_parameter_value().integer_value
         fps = self.get_parameter('fps').get_parameter_value().double_value
         self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
+        self.debug_mode = self.get_parameter('debug_mode').get_parameter_value().bool_value
         
         self.resolution = (width, height)
         self.publish_rate = fps
@@ -56,10 +58,22 @@ class CameraNode(Node):
         
         # Statistics
         self.frame_count = 0
+        self.error_count = 0
         self.start_time = time.time()
         
+        # Diagnostics timer for ArduCam troubleshooting
+        if self.debug_mode:
+            self.diag_timer = self.create_timer(10.0, self._print_diagnostics)
+        
         # Initialize camera
-        self.get_logger().info(f'Initializing camera: {camera_type} @ {self.resolution}')
+        self.get_logger().info('='*60)
+        self.get_logger().info('🎥 CAMERA NODE INITIALIZATION')
+        self.get_logger().info('='*60)
+        self.get_logger().info(f'Camera Type: {camera_type}')
+        self.get_logger().info(f'Resolution:  {self.resolution}')
+        self.get_logger().info(f'FPS Target:  {fps}')
+        self.get_logger().info(f'Debug Mode:  {self.debug_mode}')
+        
         try:
             self.camera_manager = CameraManager(
                 camera_type=camera_type,
@@ -67,14 +81,50 @@ class CameraNode(Node):
                 fps=fps
             )
             self.camera_manager.start()
+            
+            # Get detailed camera info
+            camera_info = self.camera_manager.get_camera_info()
             self.get_logger().info('✓ Camera initialized successfully')
+            self.get_logger().info(f'Actual Type: {camera_info["camera_type"]}')
+            if camera_info.get("arducam_type"):
+                self.get_logger().info(f'ArduCam Method: {camera_info["arducam_type"]}')
+            self.get_logger().info(f'Backend: {camera_info["backend"]}')
+            self.get_logger().info('='*60)
             
             # Start publishing thread
             self._start_publishing()
             
         except Exception as e:
-            self.get_logger().error(f'✗ Failed to initialize camera: {e}')
+            self.get_logger().error('='*60)
+            self.get_logger().error('✗ CAMERA INITIALIZATION FAILED')
+            self.get_logger().error(f'Error: {e}')
+            self.get_logger().error('='*60)
+            self._print_troubleshooting_tips()
             raise
+    
+    def _print_troubleshooting_tips(self):
+        """Print troubleshooting information for camera issues."""
+        self.get_logger().error('')
+        self.get_logger().error('🔧 TROUBLESHOOTING TIPS:')
+        self.get_logger().error('')
+        self.get_logger().error('1. Check camera connection:')
+        self.get_logger().error('   - Ensure ribbon cable is properly seated')
+        self.get_logger().error('   - Check camera is enabled: raspi-config')
+        self.get_logger().error('')
+        self.get_logger().error('2. Check camera detection:')
+        self.get_logger().error('   - Run: vcgencmd get_camera')
+        self.get_logger().error('   - Run: ls /dev/video*')
+        self.get_logger().error('')
+        self.get_logger().error('3. For ArduCam specifically:')
+        self.get_logger().error('   - Check ArduCam drivers are installed')
+        self.get_logger().error('   - Try: libcamera-hello --list-cameras')
+        self.get_logger().error('   - Ensure camera overlay is in /boot/config.txt')
+        self.get_logger().error('')
+        self.get_logger().error('4. Force camera type with parameter:')
+        self.get_logger().error('   - camera_type:=arducam (force ArduCam)')
+        self.get_logger().error('   - camera_type:=usb (force USB/V4L2)')
+        self.get_logger().error('   - camera_type:=mock (testing mode)')
+        self.get_logger().error('')
     
     def _start_publishing(self) -> None:
         """Start the image publishing thread."""
@@ -84,12 +134,13 @@ class CameraNode(Node):
             name="CameraPublishThread"
         )
         self._publish_thread.start()
-        self.get_logger().info(f'Started publishing at {self.publish_rate} fps')
+        self.get_logger().info(f'📸 Started publishing at {self.publish_rate} fps')
     
     def _publish_loop(self) -> None:
         """Main publishing loop running in separate thread."""
         interval = 1.0 / self.publish_rate
         next_publish = time.time()
+        consecutive_errors = 0
         
         while not self._shutdown_event.is_set():
             current_time = time.time()
@@ -103,8 +154,19 @@ class CameraNode(Node):
             next_publish = current_time + interval
             
             try:
-                # Capture frame using our proven camera abstraction
+                # Capture frame using our enhanced camera abstraction
                 frame = self.camera_manager.capture_frame()
+                
+                # Validate frame
+                if frame is None or frame.size == 0:
+                    self.error_count += 1
+                    consecutive_errors += 1
+                    if consecutive_errors <= 3:  # Only log first few errors
+                        self.get_logger().warn('Received empty frame from camera')
+                    continue
+                
+                # Reset error counter on success
+                consecutive_errors = 0
                 
                 # Convert to ROS2 Image message
                 ros_image = self._numpy_to_ros_image(frame)
@@ -114,14 +176,45 @@ class CameraNode(Node):
                 
                 # Update statistics
                 self.frame_count += 1
-                if self.frame_count % 100 == 0:
+                
+                # Periodic status updates
+                if self.debug_mode and self.frame_count % 100 == 0:
                     elapsed = time.time() - self.start_time
                     avg_fps = self.frame_count / elapsed
-                    self.get_logger().info(f'Published {self.frame_count} frames, avg FPS: {avg_fps:.2f}')
+                    self.get_logger().info(f'📊 {self.frame_count} frames published, avg FPS: {avg_fps:.2f}')
                 
             except Exception as e:
-                self.get_logger().error(f'Error in publish loop: {e}')
+                self.error_count += 1
+                consecutive_errors += 1
+                if consecutive_errors <= 5:  # Avoid spam
+                    self.get_logger().error(f'Error in publish loop: {e}')
+                elif consecutive_errors == 6:
+                    self.get_logger().error('Too many consecutive errors, suppressing further error messages')
                 time.sleep(0.1)  # Brief pause on error
+    
+    def _print_diagnostics(self):
+        """Print diagnostic information periodically."""
+        if not self.camera_manager:
+            return
+            
+        try:
+            # Get current camera info
+            info = self.camera_manager.get_camera_info()
+            elapsed = time.time() - self.start_time
+            avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+            
+            self.get_logger().info('='*50)
+            self.get_logger().info('📊 CAMERA DIAGNOSTICS')
+            self.get_logger().info(f'Type: {info["camera_type"]} ({info["backend"]})')
+            if info.get("arducam_type"):
+                self.get_logger().info(f'ArduCam: {info["arducam_type"]}')
+            self.get_logger().info(f'Frames: {self.frame_count} (errors: {self.error_count})')
+            self.get_logger().info(f'Average FPS: {avg_fps:.2f}')
+            self.get_logger().info(f'Uptime: {elapsed:.1f}s')
+            self.get_logger().info('='*50)
+            
+        except Exception as e:
+            self.get_logger().error(f'Error getting diagnostics: {e}')
     
     def _numpy_to_ros_image(self, frame: np.ndarray) -> Image:
         """
@@ -146,7 +239,7 @@ class CameraNode(Node):
     
     def destroy_node(self) -> None:
         """Clean shutdown of camera node."""
-        self.get_logger().info('Shutting down camera node...')
+        self.get_logger().info('🛑 Shutting down camera node...')
         
         # Stop publishing thread
         self._shutdown_event.set()
@@ -161,7 +254,15 @@ class CameraNode(Node):
         if self.frame_count > 0:
             elapsed = time.time() - self.start_time
             avg_fps = self.frame_count / elapsed
-            self.get_logger().info(f'Final stats: {self.frame_count} frames in {elapsed:.1f}s, avg FPS: {avg_fps:.2f}')
+            self.get_logger().info('='*50)
+            self.get_logger().info('📊 FINAL STATISTICS')
+            self.get_logger().info(f'Total frames: {self.frame_count}')
+            self.get_logger().info(f'Total errors: {self.error_count}')
+            self.get_logger().info(f'Runtime: {elapsed:.1f}s')
+            self.get_logger().info(f'Average FPS: {avg_fps:.2f}')
+            success_rate = ((self.frame_count / (self.frame_count + self.error_count)) * 100) if (self.frame_count + self.error_count) > 0 else 0
+            self.get_logger().info(f'Success rate: {success_rate:.1f}%')
+            self.get_logger().info('='*50)
         
         super().destroy_node()
 
