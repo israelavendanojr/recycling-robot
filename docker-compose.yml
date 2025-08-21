@@ -5,25 +5,48 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    devices:
-      # Expose all video devices (ArduCam typically shows up as video0/video1)
-      - /dev/video0:/dev/video0
-      - /dev/video1:/dev/video1
-      - /dev/video10:/dev/video10  # Keep original for compatibility
-      # Add media devices for better camera support
-      - /dev/media0:/dev/media0
-      - /dev/media1:/dev/media1
-    group_add:
-      - "video"
     environment:
       - PYTHONUNBUFFERED=1
-      # Remove hardcoded camera device, let the node auto-detect
       - ROS_DOMAIN_ID=0
-    privileged: true
+      # Configure camera to use host stream
+      - CAMERA_STREAM_URL=http://host.docker.internal:8554/stream.mjpg
+    # Remove device mappings - camera runs on host now
+    # devices:
+    #   - /dev/video3:/dev/video3
+    extra_hosts:
+      # Allow container to reach Pi host
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./src:/workspace/src
       - ./launch:/workspace/launch
       - ./models:/workspace/models
-      # Mount /dev for device detection
-      - /dev:/dev:ro
     working_dir: /workspace
+    # Remove privileged mode - not needed for host streams
+    # privileged: true
+    networks:
+      - robot-net
+
+  # Optional: Add Pi-hole or other host services here
+  # that might be running alongside the camera
+
+networks:
+  robot-net:
+    driver: bridge
+
+# Optional: Health check service to monitor camera stream
+  camera-monitor:
+    image: curlimages/curl:latest
+    depends_on:
+      - recycling-robot
+    command: >
+      sh -c "
+        while true; do
+          echo 'Checking camera stream...'
+          curl -f http://host.docker.internal:8554/stream.mjpg --max-time 5 || echo 'Stream check failed'
+          sleep 30
+        done
+      "
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - robot-net
