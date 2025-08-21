@@ -12,23 +12,3 @@ Pi-Safe Defaults: SQLite WAL on; MJPEG preview; telemetry downsampled; CPU temp 
 Repro: ros2 launch ... + one docker compose up path for API/dashboard.
 
 
-docker compose run --rm recycling-robot bash
-
-rm -rf build/ install/ log/
-colcon build --packages-select recycling_robot --symlink-install
-source install/setup.bash
-
-ros2 launch recycling_robot minimal.launch.py
-
-
-rm -rf build/ install/ log/ core
-
-
-# Build and run
-docker compose up --build
-
-# Or run in background
-docker compose up -d --build
-
-# View logs
-docker compose logs -f

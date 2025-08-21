@@ -6,13 +6,17 @@ services:
     ports:
       - "8000:8000"
     devices:
-      - "/dev/video0:/dev/video0"
-      - "/dev/video1:/dev/video1"
-      - "/dev/video2:/dev/video2"
+      - /dev/video10:/dev/video10
     group_add:
       - "video"
     environment:
       - PYTHONUNBUFFERED=1
-    # For live-edit instead of COPY at build, uncomment:
-    # volumes:
-    #   - ./src:/workspace/src
+      - CAMERA_DEVICE=/dev/video10
+    privileged: true
+    volumes:
+      - ./src:/workspace/src
+      - ./launch:/workspace/launch
+      - ./models:/workspace/models
+    working_dir: /workspace
+    tty: true
+    stdin_open: true

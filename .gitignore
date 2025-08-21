@@ -5,6 +5,7 @@ build/
 install/
 log/
 core
+0
 
 # Python junk
 __pycache__/
