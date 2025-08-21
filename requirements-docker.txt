@@ -6,10 +6,13 @@ click==8.1.3
 itsdangerous==2.1.2
 MarkupSafe==2.1.2
 
-# CV/ML (leave OpenCV to apt, NumPy preinstalled in Dockerfile)
+# CV/ML
+# OpenCV handled by apt (system package)
+# NumPy must be pinned for ROS2 Humble + OpenCV compatibility
+numpy==1.23.5
 torch==2.0.1
 torchvision==0.15.2
-# Pillow already installed by picamera2; pin to the same major/minor for stability:
+# Pillow already installed by picamera2; pin to the same major/minor for stability
 Pillow==11.3.0
 
 # Utilities

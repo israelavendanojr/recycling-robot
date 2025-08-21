@@ -12,20 +12,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-tools \
  && rm -rf /var/lib/apt/lists/*
 
-# Python deps (numpy from PyPI, torch from PyTorch index)
-RUN pip3 install --no-cache-dir \
-    numpy \
-    opencv-python==4.8.1.78 \
-    flask==2.3.3 \
-    pillow==10.0.1 && \
-    pip3 install torch==2.0.1 torchvision==0.15.2 \
-    --index-url https://download.pytorch.org/whl/cpu
+# Copy requirements into image
+COPY requirements-docker.txt /tmp/requirements-docker.txt
+
+# Install pinned Python deps from requirements
+RUN pip3 install --no-cache-dir -r /tmp/requirements-docker.txt \
+    --extra-index-url https://download.pytorch.org/whl/cpu
 
 WORKDIR /workspace
 
-# ROS env
+# Source ROS env automatically
 RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
-    echo "if [ -f /workspace/install/setup.bash ]; then source /workspace/install/setup.bash; fi" >> /root/.bashrc
+    echo "source /workspace/install/setup.bash" >> /root/.bashrc
 
-# Default to bash (keeps container alive)
 CMD ["bash"]
