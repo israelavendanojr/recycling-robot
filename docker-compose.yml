@@ -1,23 +1,32 @@
 services:
-  ros2:
-    build: ./ros2
-    volumes:
-      - ./ros2/src:/workspace/ros2_ws/src
-    network_mode: host
-    privileged: true   # Needed for camera access
-    devices:
-      - "/dev/video0:/dev/video0"
-    environment:
-      - API_BASE_URL=${API_BASE_URL}
-
   backend:
     build: ./backend
     volumes:
       - ./backend:/app
+      - shared_data:/data  # Shared volume for database
     ports:
       - "8000:8000"
     environment:
-      - FLASK_ENV=${FLASK_ENV}
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - API_BASE_URL=${API_BASE_URL}
+    networks:
+      - robot_network
+
+  ros2:
+    build: ./ros2
+    volumes:
+      - ./ros2/src:/workspace/ros2_ws/src
+      - shared_data:/data
+    privileged: true
+    devices:
+      - "/dev/video0:/dev/video0"
+    environment:
+      - API_BASE_URL=${API_BASE_URL}
+    networks:
+      - robot_network
+    depends_on:
+      - backend
+    command: ["tail", "-f", "/dev/null"]
 
   frontend:
     build: ./frontend
@@ -28,3 +37,15 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - VITE_STREAM_URL=${VITE_STREAM_URL}
+    networks:
+      - robot_network
+    depends_on:
+      - backend
+
+# Define custom network and shared volume
+networks:
+  robot_network:
+    driver: bridge
+
+volumes:
+  shared_data:

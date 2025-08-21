@@ -13,13 +13,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     v4l-utils \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspace/ros2_ws
+# Create a user with video group access
+RUN groupadd -r robot && useradd -r -g robot -G video robot
+RUN mkdir -p /workspace/ros2_ws && chown -R robot:robot /workspace
+RUN mkdir -p /home/robot && chown -R robot:robot /home/robot
+ENV HOME=/home/robot
 
-# Copy ROS sources
-COPY src ./src
 
 # ML + utilities
 RUN pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2 Pillow==11.3.0 requests==2.28.1
+
+USER robot
+WORKDIR /workspace/ros2_ws
+
+# Copy ROS sources
+COPY --chown=robot:robot src ./src
+
 
 # ===========================
 # Build ROS2 workspace
