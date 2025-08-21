@@ -1,57 +1,16 @@
 services:
   ros2:
     build:
-      context: .
-      dockerfile: ros2.Dockerfile
-    environment:
-      - PYTHONUNBUFFERED=1
-      - ROS_DOMAIN_ID=0
-      - VIDEO_STREAM_URL=http://host.docker.internal:8554/feed.mjpg
-      - API_BASE_URL=http://api:5000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ./ros2_ws:/workspace
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    networks:
-      - robot-net
-    depends_on:
-      - api
+      context: ..
+      dockerfile: backend/ros2.Dockerfile
+    working_dir: /workspace/ros2_ws
+    devices:
+      - /dev/video0:/dev/video0
+    command: tail -f /dev/null
 
   api:
     build:
-      context: .
-      dockerfile: api.Dockerfile
+      context: ..
+      dockerfile: backend/api.Dockerfile
     ports:
-      - "8000:5000"
-    environment:
-      - FLASK_ENV=production
-      - DATABASE_URL=sqlite:///data/robot.db
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ./backend/api:/app
-      - ./frontend/dist:/app/static
-      - api_data:/data
-    networks:
-      - robot-net
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    networks:
-      - robot-net
-    profiles: ["dev"]
-
-networks:
-  robot-net:
-    driver: bridge
-
-volumes:
-  api_data:
+      - "8000:8000"

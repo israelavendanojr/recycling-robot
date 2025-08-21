@@ -1,22 +1,30 @@
 FROM ros:humble-ros-base
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
+    python3-colcon-common-extensions \
+    python3-colcon-ros \
+    build-essential \
+    cmake \
+    git \
+    v4l-utils \
+    ffmpeg \
     ros-humble-cv-bridge \
     ros-humble-sensor-msgs \
     ros-humble-std-msgs \
+    ros-humble-image-transport \
     python3-opencv \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
+# COPY the workspace from the repo root (compose context: .)
+COPY ros2_ws /workspace/ros2_ws
 
-# Build ROS2 workspace
-COPY ros2_ws ./
-RUN . /opt/ros/humble/setup.sh && colcon build
+SHELL ["/bin/bash", "-lc"]
+RUN source /opt/ros/humble/setup.bash && \
+    cd /workspace/ros2_ws && \
+    colcon build --symlink-install
 
-# Source ROS2 in bashrc
-RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
-    echo "source /workspace/install/setup.bash" >> ~/.bashrc
-
-CMD ["bash", "-c", "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch recycling_robot robot.launch.py"]
+WORKDIR /workspace/ros2_ws
+CMD ["bash", "-lc", "tail -f /dev/null"]

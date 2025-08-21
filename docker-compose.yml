@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  ros2:
+    build:
+      context: .
+      dockerfile: backend/ros2.Dockerfile
+    working_dir: /workspace/ros2_ws
+    volumes:
+      # Optional: live-edit your workspace; comment this out if you prefer pure image build
+      - ./ros2_ws:/workspace/ros2_ws
+    devices:
+      - /dev/video0:/dev/video0
+    command: bash -lc "tail -f /dev/null"
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/api.Dockerfile
+    ports:
+      - "8000:8000"
+    # During development you can mount the static build so you don't have to rebuild image each time:
+    # volumes:
+    #   - ./frontend/dist:/app/static:ro

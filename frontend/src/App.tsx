@@ -32,7 +32,7 @@ function App() {
   const [fps, setFps] = useState(0)
   
   const imgRef = useRef<HTMLImageElement>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const frameCountRef = useRef(0)
   const lastFpsTimeRef = useRef(Date.now())
   const cacheBusterRef = useRef(0)
@@ -59,7 +59,7 @@ function App() {
       lastFpsTimeRef.current = now
     }
     
-    setStreamStatus(prev => ({
+    setStreamStatus(() => ({
       status: 'connected',
       message: 'Connected',
       lastFrameTime: new Date()

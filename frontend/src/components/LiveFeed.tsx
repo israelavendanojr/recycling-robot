@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export function LiveFeed() {
   const [error, setError] = useState(false);
