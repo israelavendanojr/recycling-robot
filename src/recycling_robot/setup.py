@@ -1,11 +1,11 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 package_name = 'recycling_robot'
 
 setup(
     name=package_name,
     version='0.0.1',
-    packages=[package_name],
+    packages=find_packages(),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -21,7 +21,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'camera_node = recycling_robot.nodes.camera_node:main',
+            'camera.py = recycling_robot.nodes.camera:main',
+            'classifier.py = recycling_robot.nodes.classifier:main',
+            'web.py = recycling_robot.nodes.web:main',
         ],
     },
 )
