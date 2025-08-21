@@ -1,11 +1,17 @@
-venv/
-logs/
+# Keep Docker build contexts slim but allow our source in
+.git
 __pycache__/
 *.pyc
-.git/
-models/*.pth
 .DS_Store
-*.mp4
-*.avi
-.pytest_cache/
-.ipynb_checkpoints/
+venv/
+node_modules/
+build/
+install/
+log/
+dataset/
+models/
+
+# Explicitly allow these (negation overrides ignores above)
+!Dockerfile
+!docker-compose.yml
+!src/**

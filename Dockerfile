@@ -1,33 +1,38 @@
 FROM ros:humble-ros-base
 
-# System deps + ROS2 pkgs
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip python3-dev build-essential \
-    ros-humble-cv-bridge ros-humble-image-transport ros-humble-sensor-msgs \
-    ros-humble-std-msgs ros-humble-geometry-msgs ros-humble-rclpy \
-    ros-humble-web-video-server ros-humble-rosbridge-server ros-humble-action-msgs \
-    python3-colcon-common-extensions \
-    v4l-utils libcamera-tools \
-    gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+    ros-humble-cv-bridge ros-humble-sensor-msgs ros-humble-std-msgs \
+    ros-humble-std-srvs ros-humble-rclpy \
+    python3-opencv libopencv-dev \
+    v4l-utils udev \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+    gstreamer1.0-tools \
  && rm -rf /var/lib/apt/lists/*
 
-# Make pip-installed packages win over distro site-packages
-ENV PYTHONPATH=/usr/local/lib/python3.10/dist-packages:$PYTHONPATH
-ENV PYTHONNOUSERSITE=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+# Python deps (pin to versions you tested)
+RUN pip3 install --no-cache-dir \
+    numpy==1.26.4 \
+    opencv-python==4.8.1.78 \
+    flask==2.3.3 \
+    pillow==10.0.1
 
-# Pin a compatible NumPy before the rest of your stack
-RUN pip3 install --no-cache-dir "numpy==1.26.4"
+# Optional torch CPU (fine for Pi dev containers or x86 host; can remove on Pi if heavy)
+RUN pip3 install --no-cache-dir \
+    torch==2.0.1 torchvision==0.15.2 \
+    --index-url https://download.pytorch.org/whl/cpu
 
 WORKDIR /workspace
-COPY requirements-docker.txt /workspace/
 
-# Now install the rest (will reuse that NumPy)
-RUN python3 -m pip install --no-cache-dir -r requirements-docker.txt
+# Copy your code
+COPY src/recycling_robot/nodes/  /workspace/src/recycling_robot/nodes/
+COPY src/recycling_robot/launch/ /workspace/src/recycling_robot/launch/
+COPY src/recycling_robot/models/ /workspace/src/recycling_robot/models/
 
-COPY . /workspace/
+# Make scripts executable (best-effort)
+RUN chmod +x /workspace/src/recycling_robot/nodes/*.py /workspace/src/recycling_robot/launch/*.py || true
 
-# Shell conveniences
-RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
-    echo "export ROS_DOMAIN_ID=0" >> /root/.bashrc && \
-    echo "export ROS_LOCALHOST_ONLY=1" >> /root/.bashrc && \
-    echo "export ROS_WS=/workspace" >> /root/.bashrc
+# Default command: launch all nodes
+CMD ["python3", "/workspace/src/recycling_robot/launch/run_all.py"]

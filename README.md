@@ -24,27 +24,11 @@ ros2 launch recycling_robot minimal.launch.py
 rm -rf build/ install/ log/ core
 
 
-Camera Node
+# Build and run
+docker compose up --build
 
-Runs the camera or mock camera.
+# Or run in background
+docker compose up -d --build
 
-Publishes images to the topic /camera/image_raw.
-
-Has parameters like resolution, frame rate, and camera type.
-
-Classifier Node
-
-Loads a trained PyTorch model (recycler.pth).
-
-Provides a ROS service /classify_image → you can send it an image, it replies with what material it sees (cardboard, glass, plastic, etc.).
-
-Web Bridge Node
-
-Starts a small web server (Flask).
-
-Serves a dashboard at http://localhost:8000.
-
-Streams video frames and shows classification stats in the browser.
-
-
-
+# View logs
+docker compose logs -f
