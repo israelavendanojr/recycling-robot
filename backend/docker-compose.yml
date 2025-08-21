@@ -1,50 +1,57 @@
 services:
-  recycling-robot:
+  ros2:
     build:
       context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+      dockerfile: ros2.Dockerfile
     environment:
       - PYTHONUNBUFFERED=1
       - ROS_DOMAIN_ID=0
-      # Configure camera to use host stream
-      - CAMERA_STREAM_URL=http://host.docker.internal:8554/stream.mjpg
-    # Remove device mappings - camera runs on host now
-    # devices:
-    #   - /dev/video3:/dev/video3
+      - VIDEO_STREAM_URL=http://host.docker.internal:8554/feed.mjpg
+      - API_BASE_URL=http://api:5000
     extra_hosts:
-      # Allow container to reach Pi host
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./src:/workspace/src
-      - ./launch:/workspace/launch
-      - ./models:/workspace/models
-    working_dir: /workspace
-    # Remove privileged mode - not needed for host streams
-    # privileged: true
+      - ./ros2_ws:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
     networks:
       - robot-net
-    command: ["python3", "/workspace/src/recycling_robot/run_all.py"]
-
-  # Optional: Health check service to monitor camera stream
-  camera-monitor:
-    image: curlimages/curl:latest
     depends_on:
-      - recycling-robot
-    command: >
-      sh -c "
-        while true; do
-          echo 'Checking camera stream...'
-          curl -f http://host.docker.internal:8554/stream.mjpg --max-time 5 || echo 'Stream check failed'
-          sleep 30
-        done
-      "
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: api.Dockerfile
+    ports:
+      - "8000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///data/robot.db
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/api:/app
+      - ./frontend/dist:/app/static
+      - api_data:/data
     networks:
       - robot-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - robot-net
+    profiles: ["dev"]
 
 networks:
   robot-net:
     driver: bridge
+
+volumes:
+  api_data:

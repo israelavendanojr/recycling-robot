@@ -1,19 +1,24 @@
 #!/bin/bash
-set -euo pipefail
 
-CAMERA_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BACKEND_DIR="$(cd "$CAMERA_SCRIPT_DIR/.." && pwd)"
+echo "🛑 Stopping Recycling Robot System..."
 
-# 1) Bring down ROS2 stack
-cd "$BACKEND_DIR"
-docker compose down || true
+# Stop containers
+echo "📦 Stopping containers..."
+docker compose down
 
-# 2) Stop camera stream if using provided script(s)
-if [ -x "$CAMERA_SCRIPT_DIR/start_camera_stream.sh" ]; then
-  "$CAMERA_SCRIPT_DIR/start_camera_stream.sh" stop || true
+# Kill camera stream
+if [ -f /tmp/camera_stream.pid ]; then
+    PID=$(cat /tmp/camera_stream.pid)
+    if kill -0 $PID 2>/dev/null; then
+        echo "📹 Stopping camera stream (PID: $PID)..."
+        kill $PID
+        sleep 2
+        kill -9 $PID 2>/dev/null || true
+    fi
+    rm -f /tmp/camera_stream.pid
 fi
 
-# Fallback: kill known processes
-pkill -f "rpicam-vid|ffmpeg|browser_stream.py" 2>/dev/null || true
+# Kill any remaining ffmpeg processes
+pkill -f "ffmpeg.*8554" || true
 
-echo "✅ ROS2 stack and camera stream stopped."
+echo "✅ System stopped"
