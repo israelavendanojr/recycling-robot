@@ -1,24 +1,27 @@
-version: "3.9"
-
 services:
   ros2:
-    build:
-      context: .
-      dockerfile: backend/ros2.Dockerfile
-    working_dir: /workspace/ros2_ws
+    build: ./ros2
     volumes:
-      # Optional: live-edit your workspace; comment this out if you prefer pure image build
-      - ./ros2_ws:/workspace/ros2_ws
+      - ./ros2/src:/workspace/ros2_ws/src
+    network_mode: host
+    privileged: true   # Needed for camera access
     devices:
-      - /dev/video0:/dev/video0
-    command: bash -lc "tail -f /dev/null"
+      - "/dev/video0:/dev/video0"
 
-  api:
-    build:
-      context: .
-      dockerfile: backend/api.Dockerfile
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
     ports:
       - "8000:8000"
-    # During development you can mount the static build so you don't have to rebuild image each time:
-    # volumes:
-    #   - ./frontend/dist:/app/static:ro
+    environment:
+      - FLASK_ENV=development
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000

@@ -1,29 +1,20 @@
-FROM ros:humble-ros-base
+FROM python:3.10-slim
 
-# System deps
+WORKDIR /app
+
+# System deps for OpenCV + ML
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip python3-dev build-essential \
-    ros-humble-cv-bridge ros-humble-sensor-msgs ros-humble-std-msgs \
-    ros-humble-std-srvs ros-humble-rclpy \
-    python3-opencv libopencv-dev \
-    v4l-utils udev \
-    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-    gstreamer1.0-tools \
-    curl \
- && rm -rf /var/lib/apt/lists/*
+    libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements into image
-COPY requirements-docker.txt /tmp/requirements-docker.txt
+# Install backend Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install pinned Python deps from requirements
-RUN pip3 install --no-cache-dir -r /tmp/requirements-docker.txt \
-    --extra-index-url https://download.pytorch.org/whl/cpu
+# Copy backend code
+COPY . .
 
-WORKDIR /workspace
+EXPOSE 8000
 
-# Source ROS env automatically
-RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
-    echo "source /workspace/install/setup.bash" >> /root/.bashrc
-
-CMD ["bash"]
+# Run Flask backend
+CMD ["flask", "--app", "app.py", "run", "--host=0.0.0.0", "--port=8000"]
