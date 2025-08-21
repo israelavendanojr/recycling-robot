@@ -6,17 +6,24 @@ services:
     ports:
       - "8000:8000"
     devices:
-      - /dev/video10:/dev/video10
+      # Expose all video devices (ArduCam typically shows up as video0/video1)
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video10:/dev/video10  # Keep original for compatibility
+      # Add media devices for better camera support
+      - /dev/media0:/dev/media0
+      - /dev/media1:/dev/media1
     group_add:
       - "video"
     environment:
       - PYTHONUNBUFFERED=1
-      - CAMERA_DEVICE=/dev/video10
+      # Remove hardcoded camera device, let the node auto-detect
+      - ROS_DOMAIN_ID=0
     privileged: true
     volumes:
       - ./src:/workspace/src
       - ./launch:/workspace/launch
       - ./models:/workspace/models
+      # Mount /dev for device detection
+      - /dev:/dev:ro
     working_dir: /workspace
-    tty: true
-    stdin_open: true

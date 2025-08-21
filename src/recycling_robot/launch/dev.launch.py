@@ -10,9 +10,9 @@ def generate_launch_description():
             name='camera_node',
             output='screen',
             emulate_tty=True,
-            parameters=[{"device_id": 10, "width": 640, "height": 480, "fps": 10.0}],
+            # Try device_id 0 first (typical for ArduCam on Pi)
+            parameters=[{"device_id": 0, "width": 640, "height": 480, "fps": 10.0}],
         ),
-
 
         # Classifier Node
         Node(
