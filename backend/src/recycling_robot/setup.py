@@ -11,6 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/dev.launch.py']),
+        ('share/' + package_name + '/config', ['config/camera.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,9 +22,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'camera.py = recycling_robot.nodes.camera:main',
-            'classifier.py = recycling_robot.nodes.classifier:main',
-            'web.py = recycling_robot.nodes.web:main',
+            'camera_node = recycling_robot.nodes.camera:main',
+            'classifier_node = recycling_robot.nodes.classifier:main',
+            'web_node = recycling_robot.nodes.web:main',
         ],
     },
 )

@@ -24,7 +24,10 @@ class SimpleWebNode(Node):
         
         # Parameters
         self.declare_parameter('port', 8000)
+        self.declare_parameter('host', '0.0.0.0')
+        
         port = self.get_parameter('port').value
+        host = self.get_parameter('host').value
         
         # Setup
         self.bridge = CvBridge()
@@ -41,7 +44,7 @@ class SimpleWebNode(Node):
             Image, '/camera/image_raw', self.image_callback, 10
         )
         self.result_sub = self.create_subscription(
-            String, '/classification_result', self.result_callback, 10
+            String, '/classifier/output', self.result_callback, 10
         )
         
         # Service client for manual classification
@@ -53,12 +56,12 @@ class SimpleWebNode(Node):
         
         # Start Flask in background thread
         self.flask_thread = threading.Thread(
-            target=lambda: self.app.run(host='0.0.0.0', port=port, debug=False),
+            target=lambda: self.app.run(host=host, port=port, debug=False),
             daemon=True
         )
         self.flask_thread.start()
         
-        self.get_logger().info(f'Web dashboard started at http://0.0.0.0:{port}')
+        self.get_logger().info(f'Web dashboard started at http://{host}:{port}')
 
     def image_callback(self, msg):
         """Store latest camera image"""
@@ -189,7 +192,7 @@ class SimpleWebNode(Node):
                 const uptime = Math.floor(data.uptime || 0);
                 const hours = Math.floor(uptime / 3600);
                 const minutes = Math.floor((uptime % 3600) / 60);
-                document.getElementById('uptime').textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
+                document.getElementById('uptime').textContent = `${hours}:${minutes.toString().padStart(2, 0)}`;
                 
                 // Update counts table
                 const tbody = document.querySelector('#counts-table tbody');

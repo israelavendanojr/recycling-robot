@@ -103,7 +103,12 @@ class SimpleClassifierNode(Node):
         
         # Parameters
         self.declare_parameter('model_path', 'models/recycler.pth')
+        self.declare_parameter('confidence_threshold', 0.7)
+        self.declare_parameter('inference_interval', 3.0)
+        
         model_path = self.get_parameter('model_path').value
+        self.confidence_threshold = self.get_parameter('confidence_threshold').value
+        self.inference_interval = self.get_parameter('inference_interval').value
         
         # Setup
         self.bridge = CvBridge()
@@ -125,17 +130,17 @@ class SimpleClassifierNode(Node):
         )
         
         # Publish classification results
-        self.result_pub = self.create_publisher(String, '/classification_result', 10)
+        self.result_pub = self.create_publisher(String, '/classifier/output', 10)
         
-        # Auto-classification timer (every 3 seconds)
-        self.timer = self.create_timer(3.0, self.auto_classify)
+        # Auto-classification timer
+        self.timer = self.create_timer(self.inference_interval, self.auto_classify)
         
         # State
         self.latest_image = None
         self.latest_result = None
         self.classification_count = 0
         
-        self.get_logger().info('Classifier node ready')
+        self.get_logger().info(f'Classifier node ready with interval: {self.inference_interval}s')
 
     def image_callback(self, msg):
         """Store latest camera image"""

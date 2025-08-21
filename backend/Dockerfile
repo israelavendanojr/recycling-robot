@@ -10,10 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
     gstreamer1.0-tools \
-    libcamera-apps \
-    libcamera-dev \
-    python3-picamera2 \
-    python3-libcamera \
+    curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements into image

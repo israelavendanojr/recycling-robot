@@ -25,15 +25,9 @@ services:
     # privileged: true
     networks:
       - robot-net
+    command: ["python3", "/workspace/src/recycling_robot/run_all.py"]
 
-  # Optional: Add Pi-hole or other host services here
-  # that might be running alongside the camera
-
-networks:
-  robot-net:
-    driver: bridge
-
-# Optional: Health check service to monitor camera stream
+  # Optional: Health check service to monitor camera stream
   camera-monitor:
     image: curlimages/curl:latest
     depends_on:
@@ -50,3 +44,7 @@ networks:
       - "host.docker.internal:host-gateway"
     networks:
       - robot-net
+
+networks:
+  robot-net:
+    driver: bridge

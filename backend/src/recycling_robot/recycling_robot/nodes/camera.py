@@ -22,7 +22,7 @@ class HostStreamCameraNode(Node):
         super().__init__('host_stream_camera')
         
         # Parameters
-        self.declare_parameter('stream_url', 'http://host.docker.internal:8554/stream.mjpg')
+        self.declare_parameter('stream_url', 'http://host.docker.internal:8554/feed.mjpg')
         self.declare_parameter('fallback_device', 0)  # Fallback to local device if stream fails
         self.declare_parameter('width', 640)
         self.declare_parameter('height', 480)
@@ -50,7 +50,7 @@ class HostStreamCameraNode(Node):
         self.thread = threading.Thread(target=self._publish_loop, daemon=True)
         self.thread.start()
         
-        self.get_logger().info(f'Host stream camera node started')
+        self.get_logger().info(f'Host stream camera node started with URL: {self.stream_url}')
 
     def _init_camera_source(self):
         """Initialize camera source (HTTP stream preferred, local fallback)"""
