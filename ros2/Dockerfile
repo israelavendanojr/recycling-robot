@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-vision-opencv \
     python3-opencv \
     python3-numpy \
+    v4l-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/ros2_ws

@@ -19,7 +19,7 @@ class ClassifierNode(Node):
         self.declare_parameter('inference_interval', 3.0)
         self.declare_parameter('confidence_threshold', 0.7)
         
-        self.api_base = self.get_parameter('api_base_url').value
+        self.api_base = os.getenv("API_BASE_URL", self.get_parameter("api_base_url").value)
         self.interval = self.get_parameter('inference_interval').value
         self.threshold = self.get_parameter('confidence_threshold').value
         
