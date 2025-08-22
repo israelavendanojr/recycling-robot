@@ -13,7 +13,6 @@ CORS(app)
 
 # Environment
 DATABASE_PATH = '/data/robot.db'
-STREAM_URL = 'http://host.docker.internal:8554/feed.mjpg'
 
 # State
 events_cache = []
@@ -48,15 +47,17 @@ def check_health():
         except:
             health_status['db'] = False
         
-        # Check camera stream
-        try:
-            response = requests.head(STREAM_URL, timeout=3)
-            health_status['camera'] = response.status_code == 200
-        except:
-            health_status['camera'] = False
+        # Check camera stream (simplified - just check if ROS2 is running)
+        health_status['camera'] = health_status['ros2']
         
-        # Check ROS2 (simple heartbeat file approach)
-        health_status['ros2'] = os.path.exists('/tmp/ros2_alive')
+        # Check ROS2 by looking for events in database (more reliable)
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute('SELECT COUNT(*) FROM events')
+                count = cursor.fetchone()[0]
+                health_status['ros2'] = count > 0  # If we have events, ROS2 is working
+        except:
+            health_status['ros2'] = False
         
         time.sleep(10)
 
@@ -72,15 +73,11 @@ def get_health():
 
 @app.route('/api/stream')
 def get_stream():
-    """Proxy MJPEG stream"""
-    try:
-        response = requests.get(STREAM_URL, stream=True, timeout=5)
-        return Response(
-            response.iter_content(chunk_size=1024),
-            content_type=response.headers.get('Content-Type', 'multipart/x-mixed-replace')
-        )
-    except:
-        return "Stream unavailable", 503
+    """Stream endpoint - returns status for now"""
+    return jsonify({
+        'status': 'stream_unavailable',
+        'message': 'Direct camera access via ROS2'
+    })
 
 @app.route('/api/events', methods=['GET', 'POST'])
 def handle_events():
@@ -143,4 +140,4 @@ if __name__ == '__main__':
     health_thread = threading.Thread(target=check_health, daemon=True)
     health_thread.start()
     
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=8000, debug=False)

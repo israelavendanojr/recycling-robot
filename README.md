@@ -1,14 +1,12 @@
 BUILD ORDER: 
 
-React: 
+Frontend: 
 cd ../frontend
-npm install
 npm run build
 
 Backend: 
 cd ../backend
 docker compose up --build -d
-docker compose ps   # confirm ros2 and api are up
 
 ROS: 
 docker compose exec ros2 bash

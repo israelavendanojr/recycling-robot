@@ -54,6 +54,8 @@ class ClassifierNode(Node):
             # Auto-classify timer
             self.timer = self.create_timer(self.interval, self.auto_classify)
             self.get_logger().info('Backend ready, starting classification service')
+        else:
+            self.get_logger().error('Failed to start classification service - backend unavailable')
 
     def _wait_for_backend(self):
         """Wait for backend to be ready with exponential backoff"""
@@ -62,6 +64,7 @@ class ClassifierNode(Node):
         max_retry_delay = 8.0 # Maximum retry delay
         start_time = time.time()
         
+        logged_waiting = False
         self.get_logger().info('Waiting for backend to be ready...')
         
         while self._running and not self._shutdown_event.is_set():
@@ -72,7 +75,9 @@ class ClassifierNode(Node):
                     self.get_logger().info('✅ Backend is ready!')
                     return
             except Exception as e:
-                self.get_logger().debug(f'Backend not ready: {e}')
+                if not logged_waiting:
+                    self.get_logger().info('Backend not ready, waiting...')
+                    logged_waiting = True
             
             # Check timeout
             elapsed = time.time() - start_time
@@ -82,7 +87,8 @@ class ClassifierNode(Node):
                 return
             
             # Wait with exponential backoff
-            self.get_logger().info(f'Backend not ready, retrying in {retry_delay:.1f}s...')
+            if not logged_waiting:
+                self.get_logger().info(f'Retrying in {retry_delay:.1f}s...')
             if self._shutdown_event.wait(retry_delay):  # Interruptible wait
                 return  # Shutdown requested
             

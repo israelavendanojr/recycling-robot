@@ -19,12 +19,10 @@ class CameraNode(Node):
         super().__init__('camera_node')
         
         # Parameters
-        self.declare_parameter('stream_url', 'http://host.docker.internal:8554/feed.mjpg')
-        self.declare_parameter('fallback_device', 0)
+        self.declare_parameter('device_id', 0)
         self.declare_parameter('fps', 10.0)
         
-        self.stream_url = self.get_parameter('stream_url').value
-        self.fallback_device = self.get_parameter('fallback_device').value
+        self.device_id = self.get_parameter('device_id').value
         self.fps = self.get_parameter('fps').value
         
         # Setup
@@ -44,20 +42,20 @@ class CameraNode(Node):
         # Remove manual signal handler - let ROS2 handle it
         # signal.signal(signal.SIGINT, self._signal_handler)  # Remove this line
         
-        self.get_logger().info(f'Camera node started: {self.stream_url}')
+        self.get_logger().info(f'Camera node started with device /dev/video{self.device_id}')
 
     def _init_camera(self):
         """Initialize camera source with better device handling"""
         # First try local device with proper V4L2 settings
         try:
-            self.get_logger().info(f'Trying to open /dev/video{self.fallback_device}...')
+            self.get_logger().info(f'Trying to open /dev/video{self.device_id}...')
             
             # Test device access first
-            if not os.path.exists(f'/dev/video{self.fallback_device}'):
-                raise Exception(f'/dev/video{self.fallback_device} does not exist')
+            if not os.path.exists(f'/dev/video{self.device_id}'):
+                raise Exception(f'/dev/video{self.device_id} does not exist')
             
             # Try with V4L2 backend and specific settings
-            self.cap = cv2.VideoCapture(self.fallback_device, cv2.CAP_V4L2)
+            self.cap = cv2.VideoCapture(self.device_id, cv2.CAP_V4L2)
             
             if self.cap.isOpened():
                 # Set camera properties
@@ -84,18 +82,7 @@ class CameraNode(Node):
                 self.cap.release()
                 self.cap = None
         
-        # Try HTTP stream fallback
-        try:
-            response = requests.head(self.stream_url, timeout=5)
-            if response.status_code == 200:
-                self.cap = cv2.VideoCapture(self.stream_url)
-                if self.cap.isOpened():
-                    self.get_logger().info('✅ HTTP stream connected')
-                    return
-        except Exception as e:
-            self.get_logger().warn(f'HTTP stream failed: {e}')
-        
-        # Both failed - use mock
+        # Local camera failed - use mock
         self.get_logger().warn('Using mock camera')
         self.cap = None
 

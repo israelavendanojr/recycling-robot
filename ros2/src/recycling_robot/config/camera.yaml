@@ -4,7 +4,7 @@
 camera_node:
   ros__parameters:
     stream_url: 'http://host.docker.internal:8554/feed.mjpg'
-    fallback_device: 0
+    device_id: 0
     width: 640
     height: 480
     fps: 10.0
