@@ -32,6 +32,8 @@ services:
     depends_on:
       - backend
     command: ["tail", "-f", "/dev/null"]
+    ports:
+      - "8080:8080"
 
   frontend:
     build: ./frontend
@@ -40,8 +42,8 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=${VITE_API_URL}
-      - VITE_STREAM_URL=${VITE_STREAM_URL}
+      - VITE_API_BASE=${VITE_API_BASE}
+      - VITE_VIDEO_URL=${VITE_VIDEO_URL}
     networks:
       - robot_network
     depends_on:

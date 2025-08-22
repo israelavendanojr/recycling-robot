@@ -18,6 +18,7 @@ DATABASE_PATH = '/data/robot.db'
 events_cache = []
 counters_cache = defaultdict(int)
 health_status = {'ros2': False, 'camera': False, 'db': False}
+classifier_running = True
 
 def init_db():
     """Initialize SQLite database"""
@@ -123,6 +124,18 @@ def get_counters():
         return jsonify(counters)
     except Exception as e:
         return jsonify({}), 500
+
+@app.route('/api/classifier/start', methods=['POST'])
+def classifier_start():
+    global classifier_running
+    classifier_running = True
+    return jsonify({'success': True, 'running': classifier_running})
+
+@app.route('/api/classifier/stop', methods=['POST'])
+def classifier_stop():
+    global classifier_running
+    classifier_running = False
+    return jsonify({'success': True, 'running': classifier_running})
 
 # Serve React app
 @app.route('/')
