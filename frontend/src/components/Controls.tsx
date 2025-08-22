@@ -11,6 +11,7 @@ export function Controls() {
       const res = await fetchHealth();
       setStatus(res);
     } catch (e: any) {
+      console.error('[Controls] fetchHealth failed', e);
       setError(e?.message || 'Health check failed');
     }
   }
@@ -28,6 +29,7 @@ export function Controls() {
       await startClassifier();
       await refreshHealth();
     } catch (e: any) {
+      console.error('[Controls] startClassifier failed', e);
       setError(e?.message || 'Failed to start');
     } finally {
       setLoading(null);
@@ -41,6 +43,7 @@ export function Controls() {
       await stopClassifier();
       await refreshHealth();
     } catch (e: any) {
+      console.error('[Controls] stopClassifier failed', e);
       setError(e?.message || 'Failed to stop');
     } finally {
       setLoading(null);

@@ -1,66 +1,76 @@
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+#!/usr/bin/env python3
+from flask import Flask, jsonify, Response
+from flask_cors import CORS
+import os
+import sqlite3
+import threading
+import time
 
-def generate_launch_description():
-    # Launch arguments
-    backend_url = LaunchConfiguration('backend_url')
-    web_host = LaunchConfiguration('web_host')
-    web_port = LaunchConfiguration('web_port')
+app = Flask(__name__)
+CORS(app)
 
-    return LaunchDescription([
-        # --- Args ---
-        DeclareLaunchArgument(
-            'backend_url',
-            default_value='http://backend:8000',
-            description='Backend API base URL'
-        ),
-        DeclareLaunchArgument(
-            'web_host',
-            default_value='0.0.0.0',
-            description='Host/interface for the Web Dashboard node'
-        ),
-        DeclareLaunchArgument(
-            'web_port',
-            default_value='8080',   # avoid clash with backend:8000
-            description='Port for the Web Dashboard node'
-        ),
+DATABASE_PATH = '/data/robot.db'
+health_status = {'ros2': False, 'camera': False, 'db': False}
 
-        # --- Camera node ---
-        Node(
-            package='recycling_robot',
-            executable='camera_node',
-            name='camera_node',
-            output='screen',
-            parameters=[{
-                'device_id': 0,
-                'fps': 10.0
-            }]
-        ),
+def init_db():
+    os.makedirs('/data', exist_ok=True)
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                class TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        ''')
+        conn.commit()
 
-        # --- Classifier node ---
-        Node(
-            package='recycling_robot',
-            executable='classifier_node',
-            name='classifier_node',
-            output='screen',
-            parameters=[{
-                'api_base_url': backend_url,
-                'inference_interval': 3.0,
-                'confidence_threshold': 0.7
-            }]
-        ),
+def check_health():
+    global health_status
+    while True:
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute('SELECT 1').fetchone()
+            health_status['db'] = True
+        except Exception:
+            health_status['db'] = False
+        # camera mirrors ros2 for now
+        health_status['camera'] = health_status['ros2']
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cur = conn.execute('SELECT COUNT(*) FROM events')
+                health_status['ros2'] = cur.fetchone()[0] > 0
+        except Exception:
+            health_status['ros2'] = False
+        time.sleep(10)
 
-        # --- Web Dashboard node ---
-        Node(
-            package='recycling_robot',
-            executable='web_node',   # ensure your setup.py/entry point names this executable
-            name='simple_web',
-            output='screen',
-            parameters=[{
-                'host': web_host,
-                'port': web_port
-            }]
-        ),
-    ])
+@app.route('/video_feed')
+def video_feed():
+    # Return a tiny black JPEG so the endpoint is reachable
+    jpeg_base64 = (
+        b'/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAQEA8QDw8QDw8PDw8PDw8PDw8PDw8PFREWFhUR\n'
+        b'FRUYHSggGBolGxUVITEhJSkrLi4uFx8zODMtNygtLisBCgoKDg0OGxAQGi0lICUtLS0tLS0tLS0t\n'
+        b'LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAEAAQAMBIgACEQEDEQH/\n'
+        b'xAAbAAACAwEBAQAAAAAAAAAAAAAEBQIDBgEAB//EADkQAAICAQIDBQMFAQkAAAAAAAECAxEEIQUS\n'
+        b'MQZBUWEiMnGBkaGx8BRCUpLB0SMzQ1NygqLC/8QAGAEAAwEBAAAAAAAAAAAAAAAAAQIDBAX/xAAj\n'
+        b'EQEBAAICAgMBAAAAAAAAAAABAgMRITESQQQiMlFx/9oADAMBAAIRAxEAPwD6ZbW2Ztq7a0q2kq5w\n'
+        b'0rZb5Kxw2E4g7gGmXGfV9Y0bN2w9l5yqkQjQyQf8q8n6t9gA1P6b6HqV0pZbjbq7c9kJ3P0Cw5Xh\n'
+        b'v8Kk8Q1rj5Jbqk5qKj3VYgJ0gY/kaHqjQq8Fqv4lqZqHn8Ck3L8YbH//2Q=='
+    )
+    import base64
+    try:
+        data = base64.b64decode(jpeg_base64)
+        return Response(data, mimetype='image/jpeg')
+    except Exception:
+        return Response(status=200)
+
+def main():
+    init_db()
+    t = threading.Thread(target=check_health, daemon=True)
+    t.start()
+    host = os.environ.get('WEB_HOST', '0.0.0.0')
+    port = int(os.environ.get('WEB_PORT', '8080'))
+    app.run(host=host, port=port, debug=False)
+
+if __name__ == '__main__':
+    main()

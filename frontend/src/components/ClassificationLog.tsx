@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchEvents, ClassificationEvent } from '../api/client';
+import { fetchEvents } from '../api/client';
+import type { ClassificationEvent } from '../api/client';
 
 export function ClassificationLog() {
   const [events, setEvents] = useState<ClassificationEvent[]>([]);
@@ -20,6 +21,7 @@ export function ClassificationLog() {
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
       } catch (e: any) {
         if (e?.name === 'AbortError') return;
+        console.error('[ClassificationLog] fetchEvents failed', e);
         setError(e?.message || 'Failed to load events');
       }
     };
