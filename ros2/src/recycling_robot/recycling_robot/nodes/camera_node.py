@@ -12,6 +12,7 @@ import threading
 import requests
 import signal
 import sys
+from rclpy.executors import ExternalShutdownException
 
 class CameraNode(Node):
     def __init__(self):
@@ -40,16 +41,10 @@ class CameraNode(Node):
         self.thread = threading.Thread(target=self._publish_loop, daemon=True)
         self.thread.start()
         
-        # Setup graceful shutdown
-        signal.signal(signal.SIGINT, self._signal_handler)
+        # Remove manual signal handler - let ROS2 handle it
+        # signal.signal(signal.SIGINT, self._signal_handler)  # Remove this line
         
         self.get_logger().info(f'Camera node started: {self.stream_url}')
-
-    def _signal_handler(self, sig, frame):
-        """Handle SIGINT gracefully"""
-        self.get_logger().info('Shutting down camera node...')
-        self._running = False
-        self._shutdown_event.set()
 
     def _init_camera(self):
         """Initialize camera source with better device handling"""
@@ -115,7 +110,8 @@ class CameraNode(Node):
                 if self.cap and self.cap.isOpened():
                     ret, frame = self.cap.read()
                     if not ret or frame is None:
-                        self.get_logger().warn('Failed to read frame, reinitializing camera...')
+                        if self._running:  # Only log if we're not shutting down
+                            self.get_logger().warn('Failed to read frame, reinitializing camera...')
                         self._init_camera()
                         frame = None
                 
@@ -133,12 +129,16 @@ class CameraNode(Node):
                 msg.header.frame_id = 'camera_link'
                 
                 self.publisher.publish(msg)
-                time.sleep(rate)
+                
+                # Use shutdown event for interruptible sleep
+                if self._shutdown_event.wait(rate):
+                    break  # Shutdown requested
                 
             except Exception as e:
                 if self._running:  # Only log if we're not shutting down
                     self.get_logger().error(f'Publishing error: {e}')
-                time.sleep(0.5)
+                if self._shutdown_event.wait(0.5):
+                    break
 
     def _create_mock_frame(self):
         """Create mock frame when camera unavailable"""
@@ -151,12 +151,15 @@ class CameraNode(Node):
 
     def destroy_node(self):
         """Clean shutdown"""
+        self.get_logger().info('Shutting down camera node...')
         self._running = False
         self._shutdown_event.set()
         
+        # Wait for thread to finish
         if hasattr(self, 'thread') and self.thread.is_alive():
             self.thread.join(timeout=2.0)
         
+        # Release camera
         if self.cap:
             self.cap.release()
             
@@ -170,7 +173,9 @@ def main():
         node = CameraNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        pass  # Handle Ctrl+C gracefully
+    except ExternalShutdownException:
+        pass  # Handle ROS2 shutdown gracefully
     finally:
         if node:
             node.destroy_node()
