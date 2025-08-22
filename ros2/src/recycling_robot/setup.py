@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             'camera_node = recycling_robot.nodes.camera_node:main',
             'classifier_node = recycling_robot.nodes.classifier_node:main',
+            'web_node = recycling_robot.nodes.web_node:main',
         ],
     },
 )
