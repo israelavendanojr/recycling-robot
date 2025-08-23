@@ -15,7 +15,16 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
-    install_requires=['setuptools', 'requests', 'opencv-python', 'torch', 'torchvision', 'numpy'],
+    install_requires=[
+        'setuptools', 
+        'requests', 
+        'opencv-python', 
+        'torch', 
+        'torchvision', 
+        'numpy',
+        'flask',           # Add Flask
+        'flask-cors',      # Add Flask-CORS
+    ],
     zip_safe=True,
     maintainer='your_name',
     maintainer_email='your@email.com',
