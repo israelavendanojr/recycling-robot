@@ -19,16 +19,25 @@ RUN mkdir -p /workspace/ros2_ws && chown -R robot:robot /workspace
 RUN mkdir -p /home/robot && chown -R robot:robot /home/robot
 ENV HOME=/home/robot
 
-
-# ML + utilities
-RUN pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2 Pillow==11.3.0 requests==2.28.1 flask==2.2.2 flask-cors==3.0.10
+# ML + utilities with compatible versions
+RUN pip install --no-cache-dir \
+    torch==2.0.1 \
+    torchvision==0.15.2 \
+    Pillow==11.3.0 \
+    requests==2.28.1 \
+    flask==2.2.2 \
+    flask-cors==3.0.10 \
+    werkzeug==2.2.2 \
+    jinja2==3.1.2 \
+    click==8.1.3 \
+    itsdangerous==2.1.2 \
+    markupsafe==2.1.2
 
 USER robot
 WORKDIR /workspace/ros2_ws
 
 # Copy ROS sources
 COPY --chown=robot:robot src ./src
-
 
 # ===========================
 # Build ROS2 workspace
