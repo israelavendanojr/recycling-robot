@@ -1,2 +1,2 @@
 .env
-ros2/src/recycling_robot/models/
+src/recycling_robot/recycling_robot/models/

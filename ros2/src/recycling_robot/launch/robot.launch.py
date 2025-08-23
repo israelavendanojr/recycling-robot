@@ -52,6 +52,17 @@ def generate_launch_description():
             }]
         ),
 
+        # --- Sorting node ---
+        Node(
+            package='recycling_robot',
+            executable='sorting_node',
+            name='sorting_node',
+            output='screen',
+            parameters=[{
+                'sorting_delay': 1.0
+            }]
+        ),
+
         # --- Web Dashboard node ---
         Node(
             package='recycling_robot',

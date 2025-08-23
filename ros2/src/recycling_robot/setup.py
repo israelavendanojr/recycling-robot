@@ -24,6 +24,7 @@ setup(
         'numpy',
         'flask',           # Add Flask
         'flask-cors',      # Add Flask-CORS
+        'pillow',          # Add Pillow for PIL Image processing
     ],
     zip_safe=True,
     maintainer='your_name',
@@ -34,6 +35,7 @@ setup(
         'console_scripts': [
             'camera_node = recycling_robot.nodes.camera_node:main',
             'classifier_node = recycling_robot.nodes.classifier_node:main',
+            'sorting_node = recycling_robot.nodes.sorting_node:main',
             'web_node = recycling_robot.nodes.web_node:main',
         ],
     },
