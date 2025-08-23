@@ -1,4 +1,4 @@
-import React from 'react';
+// import React from 'react';
 
 interface MetricCardProps {
   title: string;
@@ -20,7 +20,7 @@ export function MetricCard({
   value, 
   subtitle, 
   icon, 
-  color = 'text-blue-600', 
+  // color = 'text-blue-600', 
   bgColor = 'bg-blue-50',
   trend,
   className = ''
