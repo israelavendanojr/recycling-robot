@@ -1,1 +1,21 @@
-.env
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite3
+
+# Node.js
+node_modules/
+dist/
+build/
+
+# Models and data
+backend/models/*.pth
+backend/models/*.pt
+dataset/
+
+# System
+.DS_Store
+core
