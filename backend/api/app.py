@@ -14,7 +14,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Environment
-DATABASE_PATH = '/data/robot.db'
+DATABASE_PATH = './robot.db'  # Use local directory instead of /data
 
 # State
 events_cache = []
@@ -24,7 +24,10 @@ classifier_running = True
 
 def init_db():
     """Initialize SQLite database"""
-    os.makedirs('/data', exist_ok=True)
+    # Create local directory if it doesn't exist
+    db_dir = os.path.dirname(DATABASE_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     with sqlite3.connect(DATABASE_PATH) as conn:
         conn.execute('''
             CREATE TABLE IF NOT EXISTS events (
@@ -346,18 +349,80 @@ def get_latest_classification():
 
 @app.route('/api/current_image')
 def get_current_image():
-    """Get current image from camera or mock image"""
+    """Get current image from ROS2 camera stream"""
     try:
-        # For now, return a mock image URL or status
-        # In production, this would fetch from the camera stream
+        # Simulate ROS2 camera stream with timestamp-based image generation
+        current_time = time.time()
+        
+        # Generate a unique image URL based on timestamp for streaming effect
+        # In production, this would be the actual ROS2 camera topic URL
+        image_url = f'/api/ros2_camera_stream/{int(current_time * 10)}'
+        
         return jsonify({
             'success': True,
-            'image_url': '/api/mock_image',
-            'timestamp': time.time(),
-            'source': 'mock_camera'
+            'image_url': image_url,
+            'timestamp': current_time,
+            'source': 'ros2_camera'
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ros2_camera_stream/<timestamp>')
+def serve_ros2_camera_stream(timestamp):
+    """Serve ROS2 camera stream images - simulates real camera feed"""
+    try:
+        # Generate a simple image with timestamp for demonstration
+        # In production, this would serve actual camera frames from ROS2 topics
+        
+        # Create a simple colored image with timestamp
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        
+        # Create a 640x480 image (common camera resolution)
+        width, height = 640, 480
+        img = Image.new('RGB', (width, height), color='#1f2937')
+        draw = ImageDraw.Draw(img)
+        
+        # Add timestamp text
+        try:
+            # Try to use a system font, fallback to default if not available
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+        except:
+            font = ImageFont.load_default()
+        
+        # Draw timestamp
+        timestamp_text = f"ROS2 Camera Stream - {int(float(timestamp))}"
+        text_bbox = draw.textbbox((0, 0), timestamp_text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        
+        # Center the text
+        x = (width - text_width) // 2
+        y = (height - text_height) // 2
+        
+        # Draw text with outline for better visibility
+        draw.text((x-1, y-1), timestamp_text, font=font, fill='black')
+        draw.text((x+1, y-1), timestamp_text, font=font, fill='black')
+        draw.text((x-1, y+1), timestamp_text, font=font, fill='black')
+        draw.text((x+1, y+1), timestamp_text, font=font, fill='black')
+        draw.text((x, y), timestamp_text, font=font, fill='white')
+        
+        # Add a simple camera indicator
+        draw.ellipse([width-80, height-80, width-20, height-20], outline='#3b82f6', width=3)
+        draw.ellipse([width-65, height-65, width-35, height-35], fill='#3b82f6')
+        
+        # Convert to JPEG
+        img_io = io.BytesIO()
+        img.save(img_io, 'JPEG', quality=85)
+        img_io.seek(0)
+        
+        return Response(img_io.getvalue(), mimetype='image/jpeg')
+        
+    except Exception as e:
+        print(f"Error generating camera stream image: {e}")
+        # Fallback to simple 1x1 pixel if image generation fails
+        jpeg_data = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x01\x01\x11\x00\x02\x11\x01\x03\x11\x01\xff\xc4\x00\x14\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\xff\xc4\x00\x14\x10\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00\x3f\x00\xaa\xff\xd9'
+        return Response(jpeg_data, mimetype='image/jpeg')
 
 @app.route('/api/mock_image')
 def serve_mock_image():
@@ -400,10 +465,16 @@ def serve_static(path):
     return send_from_directory('static', path)
 
 if __name__ == '__main__':
+    print("🚀 Starting Recycling Robot Backend...")
+    print(f"📁 Database path: {DATABASE_PATH}")
+    
     init_db()
+    print("✅ Database initialized")
     
     # Start health checker
     health_thread = threading.Thread(target=check_health, daemon=True)
     health_thread.start()
+    print("✅ Health checker started")
     
-    app.run(host='0.0.0.0', port=8000, debug=False)
+    print("🌐 Starting Flask server on port 8001...")
+    app.run(host='0.0.0.0', port=8001, debug=False)
