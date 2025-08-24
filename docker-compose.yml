@@ -1,7 +1,7 @@
 services:
   backend:
     build: ./backend
-    command: ["flask", "--app", "api/app.py", "run", "--host=0.0.0.0", "--port=8000"]
+    command: ["python", "app.py"]
     volumes:
       - ./backend:/app
       - shared_data:/data  # Shared volume for database
@@ -12,8 +12,6 @@ services:
       - API_BASE_URL=${API_BASE_URL}
     networks:
       - robot_network
-
-
 
   ros2:
     build: ./ros2
@@ -35,10 +33,10 @@ services:
     ports:
       - "8080:8080"
 
-  frontend:
-    build: ./frontend
+  web:
+    build: ./web
     volumes:
-      - ./frontend:/app
+      - ./web:/app
     ports:
       - "5173:5173"
     environment:
