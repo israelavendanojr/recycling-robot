@@ -1,8 +1,8 @@
-# 🤖 Recycling Robot - Lean & Sustainable
+# Recycling Robot
 
-A robotics project focused on AI-powered waste classification and sorting, built with a clean, maintainable architecture.
+A robotics project focused on AI-powered waste classification and sorting.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
 recycling-robot/
@@ -25,7 +25,7 @@ recycling-robot/
 └── README.md            # This file
 ```
 
-## 🚀 Quick Start (3 Steps)
+## Quick Start 
 
 ### 1. Install Dependencies
 ```bash
@@ -56,7 +56,7 @@ make clean         # Clean Docker resources
 make reset         # Reset everything (use with caution!)
 ```
 
-## 📡 API Endpoints
+## API Endpoints
 
 The backend provides a single, unified API:
 
@@ -67,52 +67,21 @@ The backend provides a single, unified API:
 - `GET /api/counters` - Material counts
 - `POST /api/classifier/start|stop` - Control classifier
 
-## 🔄 Data Flow
+## Pipeline
 
 ```
 ROS2 Camera Node → ROS2 Classifier → SQLite Database → Flask API → React Frontend
 ```
 
-## 🎯 Key Design Principles
 
-- **Single API**: One Flask backend, no duplicate endpoints
-- **Clean Separation**: ROS2 for robotics, Flask for API, React for UI
-- **Minimal UI**: Dashboard shows only camera feed + classification logs
-- **Auto-connect**: Everything works without user configuration
-- **Real-time**: Live camera stream + auto-refreshing logs
-
-## 🧹 What Was Cleaned Up
-
-### ❌ Removed Bloat
-- Duplicate Flask APIs (web_node.py)
-- Nested backend/api/ structure
-- Unnecessary status indicators and controls
-- Complex UI toggles and device selectors
-- Browser camera access (replaced with ROS2 stream)
-
-### ✅ Kept Essentials
-- Core ROS2 robotics functionality
-- Single Flask API with all endpoints
-- Minimal React dashboard
-- Docker containerization
-- Comprehensive .gitignore
-
-## 🔧 Technology Stack
+## Technology Stack
 
 - **Backend**: Flask + SQLite + psutil
 - **Frontend**: React + TypeScript + Tailwind CSS
-- **Robotics**: ROS2 Humble
+- **Robotics**: ROS2 Humble, Pytorch Model
 - **Containerization**: Docker + Docker Compose
-- **Development**: Make + Virtual Environments
 
-## 📋 Prerequisites
-
-- Docker and Docker Compose
-- Python 3.10+
-- Node.js 18+
-- ROS2 Humble (for local development)
-
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 1. **Port conflicts**: Ensure ports 8000, 5173, and 8080 are available
@@ -126,24 +95,14 @@ make install      # Reinstall dependencies
 make up          # Start services
 ```
 
-## 📚 Documentation
-
-- **API Reference**: Check backend/app.py for endpoint details
-- **ROS2 Nodes**: See ros2/src/recycling_robot/recycling_robot/nodes/
-- **Frontend Components**: Explore web/src/components/
-
-## 🤝 Contributing
+## Contributing
 
 1. **Keep it lean**: Don't add complexity without clear need
 2. **Single responsibility**: Each component has one job
 3. **No duplication**: Don't create duplicate APIs or functionality
 4. **Document changes**: Update README and add comments
 
-## 📄 License
-
-This project is part of a learning robotics initiative.
-
 ---
 
-*Built with ❤️ for sustainable robotics development*
+*Built for sustainable robotics development*
 

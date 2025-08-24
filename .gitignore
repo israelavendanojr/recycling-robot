@@ -107,6 +107,7 @@ ros2/log/
 
 # Pytorch Models
 ros2/src/recycling_robot/recycling_robot/models/
+ros2/src/recycling_robot/test_images/*
 
 # Docker
 .dockerignore
