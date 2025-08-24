@@ -7,6 +7,8 @@ import os
 import requests
 import threading
 from collections import defaultdict
+import subprocess
+import psutil
 
 app = Flask(__name__)
 CORS(app)
@@ -35,41 +37,132 @@ def init_db():
         conn.execute('PRAGMA journal_mode=WAL')  # Pi-safe
         conn.commit()
 
+def check_camera_availability():
+    """Check if camera devices are available on the system"""
+    try:
+        # Check for video devices in /dev
+        video_devices = [f for f in os.listdir('/dev') if f.startswith('video')]
+        if video_devices:
+            return True
+        
+        # Alternative: check if v4l2-ctl is available and can list devices
+        try:
+            result = subprocess.run(['v4l2-ctl', '--list-devices'], 
+                                 capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                return True
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+            pass
+        
+        # Check if any process is using camera-related devices
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if proc.info['name'] and any(cam in proc.info['name'].lower() for cam in ['camera', 'v4l', 'mjpg']):
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        
+        return False
+    except Exception as e:
+        print(f"Camera availability check failed: {e}")
+        return False
+
+def check_ros2_status():
+    """Check if ROS2 processes are running"""
+    try:
+        # Check for ROS2 processes
+        ros2_processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if proc.info['name'] and any(ros in proc.info['name'].lower() for ros in ['ros', 'python3']):
+                    if proc.info['cmdline'] and any('ros' in str(cmd).lower() for cmd in proc.info['cmdline']):
+                        ros2_processes.append(proc.info['name'])
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        
+        # Also check if we have recent events in database (indicates ROS2 was working)
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute('SELECT COUNT(*) FROM events WHERE timestamp > ?', 
+                                    (time.time() - 3600,))  # Events in last hour
+                count = cursor.fetchone()[0]
+                has_recent_events = count > 0
+        except:
+            has_recent_events = False
+        
+        return len(ros2_processes) > 0 or has_recent_events
+    except Exception as e:
+        print(f"ROS2 status check failed: {e}")
+        return False
+
+def check_database_health():
+    """Check database connectivity and health"""
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            # Test basic operations
+            conn.execute('SELECT 1').fetchone()
+            
+            # Check if tables exist
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='events'")
+            table_exists = cursor.fetchone() is not None
+            
+            # Check if we can write (test insert/rollback)
+            conn.execute('BEGIN TRANSACTION')
+            conn.execute('INSERT INTO events (class, confidence, timestamp) VALUES (?, ?, ?)', 
+                        ('health_check', 1.0, time.time()))
+            conn.rollback()
+            
+            return table_exists
+    except Exception as e:
+        print(f"Database health check failed: {e}")
+        return False
+
 def check_health():
-    """Background health checker"""
+    """Background health checker with improved monitoring"""
     global health_status
     
     while True:
         try:
-            # Check database
-            with sqlite3.connect(DATABASE_PATH) as conn:
-                conn.execute('SELECT 1').fetchone()
-            health_status['db'] = True
-        except:
-            health_status['db'] = False
+            # Check database health
+            health_status['db'] = check_database_health()
+            
+            # Check camera availability
+            health_status['camera'] = check_camera_availability()
+            
+            # Check ROS2 status
+            health_status['ros2'] = check_ros2_status()
+            
+            print(f"Health check results: {health_status}")
+            
+        except Exception as e:
+            print(f"Health check error: {e}")
+            health_status = {'ros2': False, 'camera': False, 'db': False}
         
-        # Check camera stream (simplified - just check if ROS2 is running)
-        health_status['camera'] = health_status['ros2']
-        
-        # Check ROS2 by looking for events in database (more reliable)
-        try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
-                cursor = conn.execute('SELECT COUNT(*) FROM events')
-                count = cursor.fetchone()[0]
-                health_status['ros2'] = count > 0  # If we have events, ROS2 is working
-        except:
-            health_status['ros2'] = False
-        
-        time.sleep(10)
+        time.sleep(30)  # Check every 30 seconds
 
 # API Routes
 @app.route('/api/health')
 def get_health():
+    """Enhanced health endpoint with detailed status"""
     overall = all(health_status.values())
+    
+    # Get additional system info
+    try:
+        system_info = {
+            'cpu_percent': psutil.cpu_percent(interval=1),
+            'memory_percent': psutil.virtual_memory().percent,
+            'disk_usage': psutil.disk_usage('/').percent if os.path.exists('/') else 0,
+            'uptime': time.time() - psutil.boot_time()
+        }
+    except:
+        system_info = {}
+    
     return jsonify({
         'ok': overall,
         'services': health_status,
-        'timestamp': time.time()
+        'system': system_info,
+        'timestamp': time.time(),
+        'classifier_running': classifier_running
     })
 
 @app.route('/api/stream')

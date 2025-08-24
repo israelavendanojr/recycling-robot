@@ -1,12 +1,20 @@
 // import React from 'react';
+import { useState } from 'react';
 import VideoFeed from './VideoFeed';
 import ClassificationLog from './ClassificationLog';
 import Counters from './Counters';
 import Controls from './Controls';
 import MetricCard from './MetricCard';
+import SystemStatus from './SystemStatus';
 
 // Example dashboard with additional metrics
 export function Dashboard() {
+  const [cameraStatus, setCameraStatus] = useState<'active' | 'inactive' | 'error'>('inactive');
+
+  const handleCameraStatusChange = (status: 'active' | 'inactive' | 'error') => {
+    setCameraStatus(status);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
       {/* Professional Header */}
@@ -98,12 +106,13 @@ export function Dashboard() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           {/* Left Column - Video Feed & Classification Log */}
           <div className="xl:col-span-2 space-y-8">
-            <VideoFeed />
+            <VideoFeed onCameraStatusChange={handleCameraStatusChange} />
             <ClassificationLog />
           </div>
           
-          {/* Right Column - Metrics & Controls */}
+          {/* Right Column - System Status, Metrics & Controls */}
           <div className="space-y-8">
+            <SystemStatus cameraStatus={cameraStatus} />
             <Counters />
             <Controls />
           </div>
@@ -131,7 +140,17 @@ export function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span>Camera:</span>
-                <span className="font-medium">4K Industrial USB</span>
+                <span className="font-medium">Logitech C270 HD Webcam</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Camera Status:</span>
+                <span className={`font-medium ${
+                  cameraStatus === 'active' ? 'text-green-600' : 
+                  cameraStatus === 'error' ? 'text-red-600' : 'text-yellow-600'
+                }`}>
+                  {cameraStatus === 'active' ? 'Active' : 
+                   cameraStatus === 'error' ? 'Error' : 'Inactive'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Last Calibration:</span>
