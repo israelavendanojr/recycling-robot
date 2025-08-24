@@ -147,9 +147,9 @@ def main():
     host = os.environ.get('WEB_HOST', '0.0.0.0')
     port = int(os.environ.get('WEB_PORT', '8080'))
     
-    print(f'🌐 Web dashboard starting on {host}:{port}')
-    print(f'📊 API endpoints: /api/classifications, /api/classifications/latest')
-    print(f'📹 Video feed: /video_feed')
+    print(f'[WebNode] Web dashboard starting on {host}:{port}')
+    print(f'[WebNode] API endpoints: /api/classifications, /api/classifications/latest')
+    print(f'[WebNode] Video feed: /video_feed')
     
     app.run(host=host, port=port, debug=False)
 

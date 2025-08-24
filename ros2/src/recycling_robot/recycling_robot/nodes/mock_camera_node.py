@@ -43,10 +43,10 @@ class MockCameraNode(Node):
         # Load test images
         self._load_test_images()
         
-        self.get_logger().info('🖼️  Mock camera node started')
-        self.get_logger().info(f'📁 Image folder: {self.image_folder}')
-        self.get_logger().info(f'⏱️  Publish rate: {self.publish_rate}s')
-        self.get_logger().info(f'📊 Found {len(self.test_images)} test images')
+        self.get_logger().info('[MockCamera] Mock camera node started')
+        self.get_logger().info(f'[MockCamera] Image folder: {self.image_folder}')
+        self.get_logger().info(f'[MockCamera] Publish rate: {self.publish_rate}s')
+        self.get_logger().info(f'[MockCamera] Found {len(self.test_images)} test images')
 
     def _load_test_images(self):
         """Load test images from the specified folder"""
@@ -56,8 +56,8 @@ class MockCameraNode(Node):
             test_images_dir = os.path.join(package_dir, self.image_folder)
             
             if not os.path.exists(test_images_dir):
-                self.get_logger().warn(f'⚠️  Test images directory not found: {test_images_dir}')
-                self.get_logger().info('🔧 Creating sample test images...')
+                self.get_logger().warn(f'[WARN] Test images directory not found: {test_images_dir}')
+                self.get_logger().info('[MockCamera] Creating sample test images...')
                 self._create_sample_images(test_images_dir)
             
             # Get list of image files
@@ -70,12 +70,12 @@ class MockCameraNode(Node):
             self.test_images.sort()
             
             if not self.test_images:
-                self.get_logger().warn('⚠️  No test images found, creating sample images...')
+                self.get_logger().warn('[WARN] No test images found, creating sample images...')
                 self._create_sample_images(test_images_dir)
                 self._load_test_images()  # Reload after creating
             
         except Exception as e:
-            self.get_logger().error(f'❌ Failed to load test images: {e}')
+            self.get_logger().error(f'[ERROR] Failed to load test images: {e}')
             self._create_sample_images('test_images')
 
     def _create_sample_images(self, directory):
@@ -112,16 +112,16 @@ class MockCameraNode(Node):
                 filepath = os.path.join(directory, filename)
                 img.save(filepath, 'JPEG', quality=self.image_quality)
             
-            self.get_logger().info(f'🔧 Created {len(colors)} sample test images in {directory}')
+            self.get_logger().info(f'[MockCamera] Created {len(colors)} sample test images in {directory}')
             
         except Exception as e:
-            self.get_logger().error(f'❌ Failed to create sample images: {e}')
+            self.get_logger().error(f'[ERROR] Failed to create sample images: {e}')
 
     def publish_test_image(self):
         """Publish a test image from the loaded images"""
         try:
             if not self.test_images:
-                self.get_logger().warn('⚠️  No test images available')
+                self.get_logger().warn('[WARN] No test images available')
                 return
             
             # Get current image
@@ -149,13 +149,13 @@ class MockCameraNode(Node):
             
             # Log every 10th image to reduce spam
             if self.current_image_index % 10 == 0:
-                self.get_logger().info(f'📸 Published test image: {image_name}')
+                self.get_logger().info(f'[MockCamera] Published test image: {image_name}')
             
             # Move to next image
             self.current_image_index = (self.current_image_index + 1) % len(self.test_images)
             
         except Exception as e:
-            self.get_logger().error(f'❌ Failed to publish test image: {e}')
+            self.get_logger().error(f'[ERROR] Failed to publish test image: {e}')
 
 def main(args=None):
     rclpy.init(args=args)

@@ -48,20 +48,20 @@ class SortingNode(Node):
             classification = json.loads(msg.data)
             self.latest_classification = classification
             
-            self.get_logger().info(f'📥 Received: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
+            self.get_logger().info(f'[Sorting] Received: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
             
             # Trigger sorting action
             self._perform_sorting(classification)
             
         except json.JSONDecodeError as e:
-            self.get_logger().error(f'❌ Failed to parse classification message: {e}')
+            self.get_logger().error(f'[ERROR] Failed to parse classification message: {e}')
         except Exception as e:
-            self.get_logger().error(f'❌ Error processing classification: {e}')
+            self.get_logger().error(f'[ERROR] Error processing classification: {e}')
 
     def _perform_sorting(self, classification):
         """Perform the sorting action based on classification"""
         if self.sorting_busy:
-            self.get_logger().warn('⚠️  Sorting already in progress, skipping')
+            self.get_logger().warn('[WARN] Sorting already in progress, skipping')
             return
         
         self.sorting_busy = True
@@ -74,24 +74,24 @@ class SortingNode(Node):
             sorting_action = self._get_sorting_action(material_class)
             
             if sorting_action:
-                self.get_logger().info(f'🎯 SORTING: {material_class.upper()} → {sorting_action}')
-                self.get_logger().info(f'   📊 Confidence: {confidence*100:.1f}%')
-                self.get_logger().info(f'   🔧 Action: {self._describe_action(sorting_action)}')
+                self.get_logger().info(f'[Sorting] SORTING: {material_class.upper()} → {sorting_action}')
+                self.get_logger().info(f'   Confidence: {confidence*100:.1f}%')
+                self.get_logger().info(f'   Action: {self._describe_action(sorting_action)}')
                 
                 # Simulate sorting delay
                 time.sleep(self.sorting_delay)
                 
                 # Log completion
-                self.get_logger().info(f'✅ Sorting completed: {material_class} → {sorting_action}')
+                self.get_logger().info(f'[Sorting] Sorting completed: {material_class} → {sorting_action}')
                 
                 # TODO: Add actual actuator control here
                 # self._control_actuator(sorting_action)
                 
             else:
-                self.get_logger().warn(f'⚠️  Unknown material class: {material_class}')
+                self.get_logger().warn(f'[WARN] Unknown material class: {material_class}')
                 
         except Exception as e:
-            self.get_logger().error(f'❌ Sorting action failed: {e}')
+            self.get_logger().error(f'[ERROR] Sorting action failed: {e}')
         finally:
             self.sorting_busy = False
 
@@ -121,7 +121,7 @@ class SortingNode(Node):
         """Control the physical sorting actuator (placeholder for future implementation)"""
         # TODO: Implement actual actuator control
         # This will be implemented when you add motors/actuators
-        self.get_logger().info(f'🔧 Actuator control: {action}')
+        self.get_logger().info(f'[Actuator] Actuator control: {action}')
         pass
 
 def main(args=None):

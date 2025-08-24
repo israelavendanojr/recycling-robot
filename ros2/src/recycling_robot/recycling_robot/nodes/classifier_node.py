@@ -295,16 +295,16 @@ class ClassifierNode(Node):
                 return predicted_class, confidence
                 
         except Exception as e:
-            self.get_logger().error(f'❌ Inference failed: {e}')
+            self.get_logger().error(f'[ERROR] Inference failed: {e}')
             return None, 0.0
 
     def image_callback(self, msg):
         """Handle incoming image messages with clean logging"""
         try:
             self.latest_image = msg
-            self.get_logger().debug('📸 Received image from camera')
+            self.get_logger().debug('[DEBUG] Received image from camera')
         except Exception as e:
-            self.get_logger().error(f'❌ Image callback error: {e}')
+            self.get_logger().error(f'[ERROR] Image callback error: {e}')
 
     def auto_classify(self):
         """Auto-classify latest image with clean logging"""
@@ -324,7 +324,7 @@ class ClassifierNode(Node):
             
             # Check confidence threshold
             if confidence < self.threshold:
-                self.get_logger().debug(f'⚠️  Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
+                self.get_logger().debug(f'[DEBUG] Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
                 return
             
             # Create result
@@ -343,20 +343,20 @@ class ClassifierNode(Node):
             self.classification_publisher.publish(result_msg)
             
             # Log successful classification
-            self.get_logger().info(f'🎯 Predicted: {predicted_class} ({confidence*100:.1f}% confidence)')
+            self.get_logger().info(f'[Classifier] Predicted: {predicted_class} ({confidence*100:.1f}% confidence)')
             
         except Exception as e:
-            self.get_logger().error(f'❌ Auto-classify failed: {e}')
+            self.get_logger().error(f'[ERROR] Auto-classify failed: {e}')
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""
-        self.get_logger().info('🛑 Shutdown signal received')
+        self.get_logger().info('[INFO] Shutdown signal received')
         self._running = False
         self._shutdown_event.set()
 
     def destroy_node(self):
         """Clean shutdown"""
-        self.get_logger().info('🛑 Classifier node shutting down')
+        self.get_logger().info('[INFO] Classifier node shutting down')
         self._running = False
         self._shutdown_event.set()
         super().destroy_node()
