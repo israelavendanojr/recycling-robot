@@ -1,9 +1,45 @@
-import { useState } from 'react';
-import { VIDEO_URL } from '../config';
+import { useState, useEffect } from 'react';
+import { fetchCurrentImage } from '../api/client';
 
 export function VideoFeed() {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [imageInfo, setImageInfo] = useState<{ image_url: string; timestamp: number; source: string } | null>(null);
+
+  useEffect(() => {
+    const fetchImage = async () => {
+      try {
+        console.log('[VideoFeed] Fetching current image...');
+        const info = await fetchCurrentImage();
+        if (info) {
+          setImageInfo(info);
+          setError(false);
+          setLoading(false);
+          console.log('[VideoFeed] Successfully loaded image:', info);
+        } else {
+          setError(true);
+          setLoading(false);
+          console.warn('[VideoFeed] No image info received');
+        }
+      } catch (e) {
+        console.error('[VideoFeed] Failed to fetch image:', e);
+        setError(true);
+        setLoading(false);
+      }
+    };
+
+    fetchImage();
+    
+    // Refresh image info every 5 seconds
+    const interval = setInterval(fetchImage, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(false);
+    window.location.reload();
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -16,7 +52,9 @@ export function VideoFeed() {
           <div className="flex items-center space-x-2">
             <div className="flex items-center px-3 py-1 bg-white bg-opacity-20 rounded-full">
               <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
-              <span className="text-sm font-medium text-white">Streaming</span>
+              <span className="text-sm font-medium text-white">
+                {imageInfo?.source === 'mock_camera' ? 'Mock Camera' : 'Live Stream'}
+              </span>
             </div>
           </div>
         </div>
@@ -35,7 +73,7 @@ export function VideoFeed() {
                 <p className="text-gray-700 font-semibold text-lg">Stream unavailable</p>
                 <p className="text-gray-500 text-sm mt-1">Check camera connection</p>
                 <button 
-                  onClick={() => window.location.reload()}
+                  onClick={handleRetry}
                   className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium"
                 >
                   Retry Connection
@@ -52,21 +90,23 @@ export function VideoFeed() {
                   </div>
                 </div>
               )}
-              <img 
-                src={VIDEO_URL}
-                alt="Live camera feed"
-                className={`w-full h-full object-cover transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
-                onError={() => setError(true)}
-                onLoad={() => {
-                  setError(false);
-                  setLoading(false);
-                }}
-              />
+              
+              {imageInfo && !loading && (
+                <img 
+                  src={imageInfo.image_url}
+                  alt="Live camera feed"
+                  className="w-full h-full object-cover transition-opacity duration-500 opacity-100"
+                  onError={() => {
+                    console.error('[VideoFeed] Image failed to load:', imageInfo.image_url);
+                    setError(true);
+                  }}
+                />
+              )}
               
               {/* Overlay info */}
-              {!loading && !error && (
+              {!loading && !error && imageInfo && (
                 <div className="absolute bottom-4 right-4 bg-black bg-opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium">
-                  Live • HD
+                  {imageInfo.source === 'mock_camera' ? 'Mock • Test' : 'Live • HD'}
                 </div>
               )}
             </>
@@ -77,8 +117,8 @@ export function VideoFeed() {
         <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span>Camera Active</span>
+              <div className={`w-2 h-2 rounded-full mr-2 ${!error ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span>{!error ? 'Camera Active' : 'Camera Error'}</span>
             </div>
             <div className="flex items-center">
               <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
@@ -86,9 +126,17 @@ export function VideoFeed() {
             </div>
           </div>
           <div className="text-gray-500">
-            Real-time object detection
+            {imageInfo?.source === 'mock_camera' ? 'Mock camera for testing' : 'Real-time object detection'}
           </div>
         </div>
+        
+        {/* Debug info */}
+        {imageInfo && (
+          <div className="mt-2 text-xs text-gray-400">
+            <p>Source: {imageInfo.source}</p>
+            <p>Last updated: {new Date(imageInfo.timestamp * 1000).toLocaleTimeString()}</p>
+          </div>
+        )}
       </div>
     </div>
   );

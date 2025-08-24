@@ -34,6 +34,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_node = recycling_robot.nodes.camera_node:main',
+            'mock_camera_node = recycling_robot.nodes.mock_camera_node:main',
             'classifier_node = recycling_robot.nodes.classifier_node:main',
             'sorting_node = recycling_robot.nodes.sorting_node:main',
             'web_node = recycling_robot.nodes.web_node:main',

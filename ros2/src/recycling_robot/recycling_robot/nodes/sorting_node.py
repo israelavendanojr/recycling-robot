@@ -9,6 +9,9 @@ class SortingNode(Node):
     def __init__(self):
         super().__init__('sorting_node')
         
+        # Set logging level to INFO to reduce debug spam
+        self.get_logger().set_level(rclpy.logging.LoggingSeverity.INFO)
+        
         # Parameters
         self.declare_parameter('sorting_delay', 1.0)  # Delay before sorting action
         
@@ -27,16 +30,16 @@ class SortingNode(Node):
         self.latest_classification = None
         self.sorting_busy = False
         
-        self.get_logger().info('Sorting node started')
-        self.get_logger().info(f'Sorting delay: {self.sorting_delay}s')
+        self.get_logger().info('🚀 Sorting node started')
+        self.get_logger().info(f'⏱️  Sorting delay: {self.sorting_delay}s')
         
         # Log available sorting actions
-        self.get_logger().info('Available sorting actions:')
-        self.get_logger().info('  - cardboard → Bin 1 (Blue)')
-        self.get_logger().info('  - glass → Bin 2 (Green)')
-        self.get_logger().info('  - metal → Bin 3 (Yellow)')
-        self.get_logger().info('  - plastic → Bin 4 (Red)')
-        self.get_logger().info('  - trash → Bin 5 (Black)')
+        self.get_logger().info('📋 Available sorting actions:')
+        self.get_logger().info('  🔵 cardboard → Bin 1 (Blue)')
+        self.get_logger().info('  🟢 glass → Bin 2 (Green)')
+        self.get_logger().info('  🟡 metal → Bin 3 (Yellow)')
+        self.get_logger().info('  🔴 plastic → Bin 4 (Red)')
+        self.get_logger().info('  ⚫ trash → Bin 5 (Black)')
 
     def classification_callback(self, msg):
         """Handle incoming classification results"""
@@ -45,20 +48,20 @@ class SortingNode(Node):
             classification = json.loads(msg.data)
             self.latest_classification = classification
             
-            self.get_logger().info(f'Received classification: {classification["class"]} ({classification["confidence"]*100:.1f}%)')
+            self.get_logger().info(f'📥 Received: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
             
             # Trigger sorting action
             self._perform_sorting(classification)
             
         except json.JSONDecodeError as e:
-            self.get_logger().error(f'Failed to parse classification message: {e}')
+            self.get_logger().error(f'❌ Failed to parse classification message: {e}')
         except Exception as e:
-            self.get_logger().error(f'Error processing classification: {e}')
+            self.get_logger().error(f'❌ Error processing classification: {e}')
 
     def _perform_sorting(self, classification):
         """Perform the sorting action based on classification"""
         if self.sorting_busy:
-            self.get_logger().warn('Sorting already in progress, skipping')
+            self.get_logger().warn('⚠️  Sorting already in progress, skipping')
             return
         
         self.sorting_busy = True
@@ -72,8 +75,8 @@ class SortingNode(Node):
             
             if sorting_action:
                 self.get_logger().info(f'🎯 SORTING: {material_class.upper()} → {sorting_action}')
-                self.get_logger().info(f'   Confidence: {confidence*100:.1f}%')
-                self.get_logger().info(f'   Action: {self._describe_action(sorting_action)}')
+                self.get_logger().info(f'   📊 Confidence: {confidence*100:.1f}%')
+                self.get_logger().info(f'   🔧 Action: {self._describe_action(sorting_action)}')
                 
                 # Simulate sorting delay
                 time.sleep(self.sorting_delay)
@@ -85,10 +88,10 @@ class SortingNode(Node):
                 # self._control_actuator(sorting_action)
                 
             else:
-                self.get_logger().warn(f'Unknown material class: {material_class}')
+                self.get_logger().warn(f'⚠️  Unknown material class: {material_class}')
                 
         except Exception as e:
-            self.get_logger().error(f'Sorting action failed: {e}')
+            self.get_logger().error(f'❌ Sorting action failed: {e}')
         finally:
             self.sorting_busy = False
 
@@ -121,24 +124,20 @@ class SortingNode(Node):
         self.get_logger().info(f'🔧 Actuator control: {action}')
         pass
 
-def main():
-    rclpy.init()
-    node = None
+def main(args=None):
+    rclpy.init(args=args)
     
     try:
         node = SortingNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass  # Handle Ctrl+C gracefully
+        pass
     except Exception as e:
         print(f'Error in sorting node: {e}')
     finally:
-        if node:
+        if 'node' in locals():
             node.destroy_node()
-        try:
-            rclpy.shutdown()
-        except:
-            pass  # Already shutdown
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

@@ -61,6 +61,7 @@ function ClassificationTableRow({ event, isEven }: ClassificationTableRowProps) 
 export function ClassificationLog() {
   const [events, setEvents] = useState<ClassificationEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -68,23 +69,41 @@ export function ClassificationLog() {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      
       try {
+        console.log('[ClassificationLog] Fetching events...');
         const data = await fetchEvents(controller.signal);
+        
+        if (data.length !== events.length) {
+          console.log(`[ClassificationLog] Events updated: ${events.length} → ${data.length}`);
+        }
+        
         setEvents(data);
         setError(null);
+        setLastUpdate(new Date());
+        
+        if (data.length > 0) {
+          console.log(`[ClassificationLog] Latest event: ${data[0].class} (${Math.round(data[0].confidence * 100)}%) at ${new Date(data[0].timestamp * 1000).toLocaleTimeString()}`);
+        }
+        
       } catch (e: any) {
         if (e?.name === 'AbortError') return;
         console.error('[ClassificationLog] fetchEvents failed', e);
         setError(e?.message || 'Failed to load events');
       }
     };
+    
     const interval = setInterval(tick, 2000);
-    tick();
+    tick(); // Initial fetch
+    
+    console.log('[ClassificationLog] Component mounted, starting event polling');
+    
     return () => {
+      console.log('[ClassificationLog] Component unmounting, cleaning up');
       clearInterval(interval);
       abortRef.current?.abort();
     };
-  }, []);
+  }, [events.length]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -177,7 +196,7 @@ export function ClassificationLog() {
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span className="font-medium">Total Events: {events.length}</span>
-            <span>Last updated: {new Date().toLocaleTimeString()}</span>
+            <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
           </div>
         </div>
       )}

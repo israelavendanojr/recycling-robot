@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import String
-from cv_bridge import CvBridge
-import cv2
-import numpy as np
 import time
 import requests
 import json
@@ -17,17 +14,16 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image as PILImage
-
-# Debug: Print versions and paths
-print(f"OpenCV version: {cv2.__version__}")
-print(f"OpenCV path: {cv2.__file__}")
-print(f"NumPy version: {np.__version__}")
-print(f"NumPy path: {np.__file__}")
-print(f"Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
+import io
+import sqlite3
+from datetime import datetime
 
 class ClassifierNode(Node):
     def __init__(self):
         super().__init__('classifier_node')
+        
+        # Set logging level to INFO to reduce debug spam
+        self.get_logger().set_level(rclpy.logging.LoggingSeverity.INFO)
         
         # Parameters
         self.declare_parameter('api_base_url', 'http://backend:8000')
@@ -41,9 +37,6 @@ class ClassifierNode(Node):
         self.threshold = self.get_parameter('confidence_threshold').value
         self.model_path = self.get_parameter('model_path').value
         
-        # Setup
-        self.bridge = CvBridge()
-        
         # State
         self.latest_image = None
         self.classes = ['cardboard', 'glass', 'metal', 'plastic', 'trash']
@@ -54,17 +47,16 @@ class ClassifierNode(Node):
         # PyTorch model setup
         self.model = None
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
         
         # Load the PyTorch model
         self._load_model()
         
-        self.get_logger().info(f'Classifier node started, API: {self.api_base}')
-        self.get_logger().info(f'Using device: {self.device}')
+        # Initialize SQLite database
+        self._init_database()
+        
+        self.get_logger().info('🚀 Classifier node started')
+        self.get_logger().info(f'📱 API endpoint: {self.api_base}')
+        self.get_logger().info(f'💻 Using device: {self.device}')
         
         # Wait for backend before starting subscriptions and timers
         self._wait_for_backend()
@@ -72,7 +64,7 @@ class ClassifierNode(Node):
         # Only create subscriptions and timer after backend is ready
         if self._running:  # Check if we haven't been shutdown during backend wait
             self.subscription = self.create_subscription(
-                Image, '/camera/image_raw', self.image_callback, 10
+                CompressedImage, 'camera/image_raw', self.image_callback, 10
             )
             
             # Publisher for classification results
@@ -84,9 +76,9 @@ class ClassifierNode(Node):
             
             # Auto-classify timer
             self.timer = self.create_timer(self.interval, self.auto_classify)
-            self.get_logger().info('Backend ready, starting classification service')
+            self.get_logger().info('✅ Backend ready, classification service active')
         else:
-            self.get_logger().error('Failed to start classification service - backend unavailable')
+            self.get_logger().error('❌ Failed to start classification service - backend unavailable')
 
     def _wait_for_backend(self):
         """Wait for backend to be ready with exponential backoff"""
@@ -96,7 +88,7 @@ class ClassifierNode(Node):
         start_time = time.time()
         
         logged_waiting = False
-        self.get_logger().info('Waiting for backend to be ready...')
+        self.get_logger().info('⏳ Waiting for backend to be ready...')
         
         while self._running and not self._shutdown_event.is_set():
             try:
@@ -105,104 +97,180 @@ class ClassifierNode(Node):
                     self._backend_ready = True
                     self.get_logger().info('✅ Backend is ready!')
                     return
-            except Exception as e:
+                else:
+                    if not logged_waiting:
+                        self.get_logger().info(f'⏳ Backend responded with status {response.status_code}, retrying...')
+                        logged_waiting = True
+                        
+            except requests.exceptions.RequestException as e:
                 if not logged_waiting:
-                    self.get_logger().info('Backend not ready, waiting...')
+                    self.get_logger().info(f'⏳ Backend not responding: {e}, retrying...')
                     logged_waiting = True
             
-            # Check timeout
-            elapsed = time.time() - start_time
-            if elapsed > max_wait_time:
-                self.get_logger().error(f'Backend not ready after {max_wait_time}s, giving up')
+            # Check if we've exceeded max wait time
+            if time.time() - start_time > max_wait_time:
+                self.get_logger().error(f'❌ Backend not ready after {max_wait_time}s, giving up')
                 self._running = False
                 return
             
-            # Wait with exponential backoff
-            if not logged_waiting:
-                self.get_logger().info(f'Retrying in {retry_delay:.1f}s...')
-            if self._shutdown_event.wait(retry_delay):  # Interruptible wait
-                return  # Shutdown requested
-            
-            retry_delay = min(retry_delay * 1.5, max_retry_delay)
+            # Exponential backoff
+            time.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, max_retry_delay)
 
     def _load_model(self):
-        """Load the PyTorch model"""
+        """Load PyTorch model with clean logging"""
         try:
-            # Debug: Log current working directory and model path
-            cwd = os.getcwd()
-            self.get_logger().info(f'Current working directory: {cwd}')
-            self.get_logger().info(f'Looking for model at: {self.model_path}')
+            self.get_logger().info('📦 Loading PyTorch model...')
             
-            # Try to load .pt file as regular PyTorch model first
-            if os.path.exists(self.model_path):
-                self.get_logger().info(f'Found .pt file at {self.model_path}')
-                try:
-                    self.model = torch.load(self.model_path, map_location=self.device)
-                    self.get_logger().info(f'Loaded PyTorch model from {self.model_path}')
-                except Exception as pt_error:
-                    self.get_logger().info(f'Failed to load as PyTorch model: {pt_error}, trying as JIT...')
-                    try:
-                        self.model = torch.jit.load(self.model_path, map_location=self.device)
-                        self.get_logger().info(f'Loaded JIT model from {self.model_path}')
-                    except Exception as jit_error:
-                        self.get_logger().error(f'Failed to load as JIT model: {jit_error}')
-                        raise
-            else:
-                # Fallback to .pth file
-                pth_path = self.model_path.replace('.pt', '.pth')
-                self.get_logger().info(f'.pt file not found, trying .pth file at: {pth_path}')
-                if os.path.exists(pth_path):
-                    self.get_logger().info(f'Found PyTorch model at {pth_path}')
-                    self.model = torch.load(pth_path, map_location=self.device)
-                    self.get_logger().info(f'Loaded PyTorch model from {pth_path}')
-                else:
-                    # List contents of the models directory for debugging
-                    models_dir = os.path.dirname(self.model_path)
-                    if os.path.exists(models_dir):
-                        files = os.listdir(models_dir)
-                        self.get_logger().info(f'Contents of {models_dir}: {files}')
-                    else:
-                        self.get_logger().info(f'Models directory {models_dir} does not exist')
-                    raise FileNotFoundError(f'Model file not found at {self.model_path} or {pth_path}')
+            # Check if model file exists
+            if not os.path.exists(self.model_path):
+                self.get_logger().warn(f'⚠️  Model file not found: {self.model_path}')
+                self.get_logger().info('🔧 Using fallback model initialization...')
+                # Initialize a simple fallback model for testing
+                self.model = self._create_fallback_model()
+                return
             
-            # Set model to evaluation mode
+            # Load the actual model
+            self.model = torch.load(self.model_path, map_location=self.device)
             self.model.eval()
-            self.get_logger().info('Model loaded successfully and set to evaluation mode')
-            
-            # Debug: Log model information
-            self.get_logger().info(f'Model type: {type(self.model)}')
-            if hasattr(self.model, 'forward'):
-                self.get_logger().info('Model has forward method')
-            if hasattr(self.model, 'modules'):
-                self.get_logger().info(f'Model has {len(list(self.model.modules()))} modules')
+            self.get_logger().info('✅ PyTorch model loaded successfully')
             
         except Exception as e:
-            self.get_logger().error(f'Failed to load model: {e}')
-            self.model = None
+            self.get_logger().error(f'❌ Failed to load model: {e}')
+            self.get_logger().info('🔧 Using fallback model...')
+            self.model = self._create_fallback_model()
 
-    def _preprocess_image(self, ros_image_msg):
-        """Preprocess image for model inference using dummy tensor (bypasses all NumPy issues)"""
+    def _create_fallback_model(self):
+        """Create a simple fallback model for testing"""
         try:
-            # Since we can't access any image data due to NumPy compatibility issues,
-            # we'll create a dummy tensor for testing the model inference pipeline
-            # This allows us to verify that the real PyTorch model works
+            # Simple linear model as fallback
+            model = torch.nn.Sequential(
+                torch.nn.Linear(224 * 224 * 3, 128),
+                torch.nn.ReLU(),
+                torch.nn.Linear(128, len(self.classes)),
+                torch.nn.Softmax(dim=1)
+            )
+            model.eval()
+            self.get_logger().info('🔧 Fallback model created for testing')
+            return model
+        except Exception as e:
+            self.get_logger().error(f'❌ Failed to create fallback model: {e}')
+            return None
+
+    def _init_database(self):
+        """Initialize SQLite database with clean logging"""
+        try:
+            db_path = os.path.expanduser('~/classifications.db')
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
             
-            # Create a dummy tensor with the expected input shape
-            # Shape: [batch_size, channels, height, width] = [1, 3, 224, 224]
-            import torch
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
             
-            # Create a simple tensor with random values
-            # This simulates a preprocessed image without using PIL or any image processing
-            dummy_tensor = torch.randn(1, 3, 224, 224)  # Random values, normalized
+            # Create classifications table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS classifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    raw_logits TEXT,
+                    image_source TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
             
-            # Move to device
-            dummy_tensor = dummy_tensor.to(self.device)
+            conn.commit()
+            conn.close()
             
-            self.get_logger().info('Created dummy tensor for classification testing')
-            return dummy_tensor
+            self.db_path = db_path
+            self.get_logger().info(f'💾 Database initialized: {db_path}')
             
         except Exception as e:
-            self.get_logger().error(f'Image preprocessing failed: {e}')
+            self.get_logger().error(f'❌ Database initialization failed: {e}')
+            self.db_path = None
+
+    def _log_to_database(self, result):
+        """Log classification result to SQLite database"""
+        if self.db_path is None:
+            return
+            
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Insert classification result
+            cursor.execute('''
+                INSERT INTO classifications (timestamp, label, confidence, raw_logits, image_source)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                datetime.now().isoformat(),
+                result['class'],
+                result['confidence'],
+                json.dumps(result.get('raw_logits', [])),
+                'mock_camera'  # We'll update this when real camera is connected
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            # Only log successful database writes at DEBUG level
+            self.get_logger().debug(f'💾 Logged to database: {result["class"]} ({result["confidence"]*100:.1f}%)')
+            
+        except Exception as e:
+            self.get_logger().error(f'❌ Database write failed: {e}')
+
+    def _preprocess_image(self, compressed_image_msg):
+        """Preprocess compressed image for model inference using PIL + Torch only"""
+        try:
+            # Extract image data from CompressedImage message
+            if compressed_image_msg.format != 'jpeg':
+                self.get_logger().warn(f'⚠️  Unsupported image format: {compressed_image_msg.format}')
+                return None
+            
+            # Convert compressed image data to PIL Image
+            image_data = compressed_image_msg.data
+            pil_image = PILImage.open(io.BytesIO(image_data))
+            
+            # Convert to RGB if necessary
+            if pil_image.mode != 'RGB':
+                pil_image = pil_image.convert('RGB')
+            
+            # Manual preprocessing without transforms to avoid NumPy issues
+            # Resize to 224x224
+            pil_image = pil_image.resize((224, 224), PILImage.Resampling.LANCZOS)
+            
+            # Convert to tensor manually
+            import torch
+            # Convert PIL image to list of pixel values
+            pixel_data = list(pil_image.getdata())
+            
+            # Reshape to (height, width, channels)
+            height, width = 224, 224
+            channels = 3
+            tensor_data = []
+            
+            for y in range(height):
+                row = []
+                for x in range(width):
+                    pixel = pixel_data[y * width + x]
+                    # Normalize to [0, 1] and convert to float
+                    r, g, b = pixel[0] / 255.0, pixel[1] / 255.0, pixel[2] / 255.0
+                    row.append([r, g, b])
+                tensor_data.append(row)
+            
+            # Convert to tensor and reshape to (channels, height, width)
+            tensor = torch.tensor(tensor_data, dtype=torch.float32)
+            tensor = tensor.permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+            
+            # Add batch dimension
+            tensor = tensor.unsqueeze(0)
+            
+            # Only log preprocessing at DEBUG level
+            self.get_logger().debug(f'🖼️  Image preprocessed: {pil_image.size[0]}x{pil_image.size[1]} → {tensor.shape}')
+            return tensor.to(self.device)
+            
+        except Exception as e:
+            self.get_logger().error(f'❌ Image preprocessing failed: {e}')
             return None
 
     def _run_inference(self, image_tensor):
@@ -215,166 +283,98 @@ class ClassifierNode(Node):
                 # Run inference
                 outputs = self.model(image_tensor)
                 
-                # Debug: Log output shape and type
-                self.get_logger().info(f'Model output shape: {outputs.shape}, type: {type(outputs)}')
-                self.get_logger().info(f'Model output sample: {outputs[:2]}')  # First 2 values
+                # Get probabilities
+                probs = F.softmax(outputs, dim=1)
+                confidence, predicted = torch.max(probs, 1)
                 
-                # Apply softmax to get probabilities
-                probabilities = F.softmax(outputs, dim=1)
+                # Convert to Python types
+                confidence = confidence.item()
+                predicted_idx = predicted.item()
+                predicted_class = self.classes[predicted_idx]
                 
-                # Get the highest probability and its index
-                confidence, predicted_idx = torch.max(probabilities, 1)
-                
-                # Convert to Python values
-                predicted_class = self.classes[predicted_idx.item()]
-                confidence_value = confidence.item()
-                
-                return predicted_class, confidence_value
+                return predicted_class, confidence
                 
         except Exception as e:
-            self.get_logger().error(f'Inference failed: {e}')
+            self.get_logger().error(f'❌ Inference failed: {e}')
             return None, 0.0
 
     def image_callback(self, msg):
-        """Store latest image for classification"""
-        if not self._running:
-            return
-            
+        """Handle incoming image messages with clean logging"""
         try:
-            # Store the raw ROS2 Image message directly to avoid OpenCV/NumPy issues
             self.latest_image = msg
+            self.get_logger().debug('📸 Received image from camera')
         except Exception as e:
-            if self._running:  # Only log if not shutting down
-                self.get_logger().error(f'Image storage error: {e}')
+            self.get_logger().error(f'❌ Image callback error: {e}')
 
     def auto_classify(self):
-        """Perform automatic classification using real PyTorch model"""
-        if not self._running or self.latest_image is None or self.model is None:
+        """Auto-classify latest image with clean logging"""
+        if not self._running or self.latest_image is None:
             return
-        
+            
         try:
-            # Check backend health with less frequent logging
-            if not self._check_backend_health():
-                return
-                
-            # Preprocess image for model
+            # Preprocess image
             image_tensor = self._preprocess_image(self.latest_image)
             if image_tensor is None:
-                self.get_logger().warn('Failed to preprocess image, skipping classification')
                 return
             
-            # Run real inference
+            # Run inference
             predicted_class, confidence = self._run_inference(image_tensor)
-            
             if predicted_class is None:
-                self.get_logger().warn('Inference failed, skipping classification')
                 return
             
-            # Only proceed if confidence meets threshold
+            # Check confidence threshold
             if confidence < self.threshold:
-                self.get_logger().debug(f'Confidence {confidence:.3f} below threshold {self.threshold}, skipping')
+                self.get_logger().debug(f'⚠️  Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
                 return
             
+            # Create result
             result = {
                 'class': predicted_class,
-                'confidence': float(confidence),
-                'timestamp': time.time()
+                'confidence': confidence,
+                'raw_logits': None  # We could add this if needed
             }
             
-            # Publish to ROS2 topic for sorting node
-            classification_msg = String()
-            classification_msg.data = json.dumps(result)
-            self.classification_publisher.publish(classification_msg)
-            self.get_logger().info(f"Published classification: {result['class']} ({result['confidence']*100:.1f}%)")
+            # Log to database
+            self._log_to_database(result)
             
-            # POST to API with retry logic
-            self._send_classification(result)
-                
+            # Publish result
+            result_msg = String()
+            result_msg.data = json.dumps(result)
+            self.classification_publisher.publish(result_msg)
+            
+            # Log successful classification
+            self.get_logger().info(f'🎯 Predicted: {predicted_class} ({confidence*100:.1f}% confidence)')
+            
         except Exception as e:
-            if self._running:  # Only log if we're not shutting down
-                self.get_logger().error(f'Classification failed: {e}')
+            self.get_logger().error(f'❌ Auto-classify failed: {e}')
 
-    def _check_backend_health(self):
-        """Check if backend is available - less verbose after initial connection"""
-        try:
-            response = requests.get(f'{self.api_base}/api/health', timeout=2.0)
-            if response.status_code == 200:
-                if not self._backend_ready:
-                    self._backend_ready = True
-                    self.get_logger().info('Backend reconnected')
-                return True
-            else:
-                if self._backend_ready:
-                    self._backend_ready = False
-                    self.get_logger().warn('Backend unhealthy, will retry')
-                return False
-        except Exception:
-            if self._backend_ready:
-                self._backend_ready = False
-                self.get_logger().warn('Backend connection lost, will retry')
-            return False
-
-    def _send_classification(self, result):
-        """Send classification result to backend with retry"""
-        max_retries = 3
-        
-        for attempt in range(max_retries):
-            try:
-                response = requests.post(
-                    f'{self.api_base}/api/events',
-                    json=result,
-                    timeout=5.0
-                )
-                
-                if response.status_code == 200:
-                    self.get_logger().info(
-                        f"Classification: {result['class']} ({result['confidence']*100:.1f}%)"
-                    )
-                    return
-                else:
-                    self.get_logger().warn(f'API POST failed: {response.status_code}')
-                    
-            except requests.exceptions.ConnectionError as e:
-                if attempt < max_retries - 1:
-                    self.get_logger().debug(f'Connection failed (attempt {attempt+1}/{max_retries}), retrying...')
-                    time.sleep(1.0)
-                else:
-                    self.get_logger().error(f'All connection attempts failed: {e}')
-                    self._backend_ready = False  # Mark backend as not ready
-            except Exception as e:
-                self.get_logger().error(f'API request failed: {e}')
-                break
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals"""
+        self.get_logger().info('🛑 Shutdown signal received')
+        self._running = False
+        self._shutdown_event.set()
 
     def destroy_node(self):
         """Clean shutdown"""
-        self.get_logger().info('Shutting down classifier node...')
+        self.get_logger().info('🛑 Classifier node shutting down')
         self._running = False
         self._shutdown_event.set()
-        
-        # Cancel timer if it exists
-        if hasattr(self, 'timer'):
-            self.timer.cancel()
-        
         super().destroy_node()
 
-def main():
-    rclpy.init()
-    node = None
+def main(args=None):
+    rclpy.init(args=args)
     
     try:
         node = ClassifierNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass  # Handle Ctrl+C gracefully
+        pass
     except ExternalShutdownException:
-        pass  # Handle ROS2 shutdown gracefully
+        pass
     finally:
-        if node:
+        if 'node' in locals():
             node.destroy_node()
-        try:
-            rclpy.shutdown()
-        except:
-            pass  # Already shutdown
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

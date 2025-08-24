@@ -113,6 +113,166 @@ def handle_events():
         except Exception as e:
             return jsonify([]), 500
 
+@app.route('/api/classifications')
+def get_classifications():
+    """Get classification history from SQLite database - matches ROS2 web_node format"""
+    try:
+        # Try to connect to the classifier's database first
+        db_path = os.path.expanduser('~/classifications.db')
+        if not os.path.exists(db_path):
+            # Fallback to our local database
+            db_path = DATABASE_PATH
+        
+        with sqlite3.connect(db_path) as conn:
+            # Check if this is the classifier database or our events database
+            try:
+                cursor = conn.execute('''
+                    SELECT id, timestamp, label, confidence, raw_logits, image_source, created_at
+                    FROM classifications 
+                    ORDER BY created_at DESC 
+                    LIMIT 100
+                ''')
+                rows = cursor.fetchall()
+                classifications = []
+                
+                for row in rows:
+                    classifications.append({
+                        'id': row[0],
+                        'timestamp': row[1],
+                        'label': row[2],
+                        'confidence': row[3],
+                        'raw_logits': row[4],
+                        'image_source': row[5],
+                        'created_at': row[6]
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'count': len(classifications),
+                    'classifications': classifications
+                })
+                
+            except sqlite3.OperationalError:
+                # This is our events database, use different schema
+                cursor = conn.execute('''
+                    SELECT id, class, confidence, timestamp
+                    FROM events 
+                    ORDER BY timestamp DESC 
+                    LIMIT 100
+                ''')
+                rows = cursor.fetchall()
+                classifications = []
+                
+                for row in rows:
+                    classifications.append({
+                        'id': row[0],
+                        'timestamp': row[3],  # timestamp is the last column
+                        'label': row[1],      # class is the second column
+                        'confidence': row[2],  # confidence is the third column
+                        'raw_logits': None,
+                        'image_source': 'camera',
+                        'created_at': row[3]
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'count': len(classifications),
+                    'classifications': classifications
+                })
+            
+    except Exception as e:
+        print(f"Error in get_classifications: {e}")
+        return jsonify({'error': str(e), 'classifications': []})
+
+@app.route('/api/classifications/latest')
+def get_latest_classification():
+    """Get the most recent classification"""
+    try:
+        # Try to connect to the classifier's database first
+        db_path = os.path.expanduser('~/classifications.db')
+        if not os.path.exists(db_path):
+            # Fallback to our local database
+            db_path = DATABASE_PATH
+        
+        with sqlite3.connect(db_path) as conn:
+            # Check if this is the classifier database or our events database
+            try:
+                cursor = conn.execute('''
+                    SELECT id, timestamp, label, confidence, raw_logits, image_source, created_at
+                    FROM classifications 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ''')
+                
+                row = cursor.fetchone()
+                if row:
+                    return jsonify({
+                        'success': True,
+                        'classification': {
+                            'id': row[0],
+                            'timestamp': row[1],
+                            'label': row[2],
+                            'confidence': row[3],
+                            'raw_logits': row[4],
+                            'image_source': row[5],
+                            'created_at': row[6]
+                        }
+                    })
+                else:
+                    return jsonify({'error': 'No classifications found'})
+                    
+            except sqlite3.OperationalError:
+                # This is our events database, use different schema
+                cursor = conn.execute('''
+                    SELECT id, class, confidence, timestamp
+                    FROM events 
+                    ORDER BY timestamp DESC 
+                    LIMIT 1
+                ''')
+                
+                row = cursor.fetchone()
+                if row:
+                    return jsonify({
+                        'success': True,
+                        'classification': {
+                            'id': row[0],
+                            'timestamp': row[3],
+                            'label': row[1],
+                            'confidence': row[2],
+                            'raw_logits': None,
+                            'image_source': 'camera',
+                            'created_at': row[3]
+                        }
+                    })
+                else:
+                    return jsonify({'error': 'No classifications found'})
+                
+    except Exception as e:
+        print(f"Error in get_latest_classification: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/current_image')
+def get_current_image():
+    """Get current image from camera or mock image"""
+    try:
+        # For now, return a mock image URL or status
+        # In production, this would fetch from the camera stream
+        return jsonify({
+            'success': True,
+            'image_url': '/api/mock_image',
+            'timestamp': time.time(),
+            'source': 'mock_camera'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/mock_image')
+def serve_mock_image():
+    """Serve a mock image for testing"""
+    # Return a simple 1x1 pixel JPEG
+    jpeg_data = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x01\x01\x11\x00\x02\x11\x01\x03\x11\x01\xff\xc4\x00\x14\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\xff\xc4\x00\x14\x10\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00\x3f\x00\xaa\xff\xd9'
+    return Response(jpeg_data, mimetype='image/jpeg')
+
 @app.route('/api/counters')
 def get_counters():
     try:

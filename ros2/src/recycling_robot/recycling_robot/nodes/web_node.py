@@ -54,7 +54,7 @@ def video_feed():
         b'xAAbAAACAwEBAQAAAAAAAAAAAAAEBQIDBgEAB//EADkQAAICAQIDBQMFAQkAAAAAAAECAxEEIQUS\n'
         b'MQZBUWEiMnGBkaGx8BRCUpLB0SMzQ1NygqLC/8QAGAEAAwEBAAAAAAAAAAAAAAAAAQIDBAX/xAAj\n'
         b'EQEBAAICAgMBAAAAAAAAAAABAgMRITESQQQiMlFx/9oADAMBAAIRAxEAPwD6ZbW2Ztq7a0q2kq5w\n'
-        b'0rZb5Kxw2E4g7gGmXGfV9Y0bN2w9l5yqkQjQyQf8q8n6t9gA1P6b6HqV0pZbjbq7c9kJ3P0Cw5Xh\n'
+        b'0rZb5Kxw2E4gGmXGfV9Y0bN2w9l5yqkQjQyQf8q8n6t9gA1P6b6HqV0pZbjbq7c9kJ3P0Cw5Xh\n'
         b'v8Kk8Q1rj5Jbqk5qKj3VYgJ0gY/kaHqjQq8Fqv4lqZqHn8Ck3L8YbH//2Q=='
     )
     import base64
@@ -64,12 +64,93 @@ def video_feed():
     except Exception:
         return Response(status=200)
 
+@app.route('/api/classifications')
+def get_classifications():
+    """Get classification history from SQLite database"""
+    try:
+        # Try to connect to the classifier's database
+        db_path = os.path.expanduser('~/classifications.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found', 'classifications': []})
+        
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.execute('''
+                SELECT id, timestamp, label, confidence, raw_logits, image_source, created_at
+                FROM classifications 
+                ORDER BY created_at DESC 
+                LIMIT 100
+            ''')
+            
+            rows = cursor.fetchall()
+            classifications = []
+            
+            for row in rows:
+                classifications.append({
+                    'id': row[0],
+                    'timestamp': row[1],
+                    'label': row[2],
+                    'confidence': row[3],
+                    'raw_logits': row[4],
+                    'image_source': row[5],
+                    'created_at': row[6]
+                })
+            
+            return jsonify({
+                'success': True,
+                'count': len(classifications),
+                'classifications': classifications
+            })
+            
+    except Exception as e:
+        return jsonify({'error': str(e), 'classifications': []})
+
+@app.route('/api/classifications/latest')
+def get_latest_classification():
+    """Get the most recent classification"""
+    try:
+        db_path = os.path.expanduser('~/classifications.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'})
+        
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.execute('''
+                SELECT id, timestamp, label, confidence, raw_logits, image_source, created_at
+                FROM classifications 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            ''')
+            
+            row = cursor.fetchone()
+            if row:
+                return jsonify({
+                    'success': True,
+                    'classification': {
+                        'id': row[0],
+                        'timestamp': row[1],
+                        'label': row[2],
+                        'confidence': row[3],
+                        'raw_logits': row[4],
+                        'image_source': row[5],
+                        'created_at': row[6]
+                    }
+                })
+            else:
+                return jsonify({'error': 'No classifications found'})
+                
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 def main():
     init_db()
     t = threading.Thread(target=check_health, daemon=True)
     t.start()
     host = os.environ.get('WEB_HOST', '0.0.0.0')
     port = int(os.environ.get('WEB_PORT', '8080'))
+    
+    print(f'🌐 Web dashboard starting on {host}:{port}')
+    print(f'📊 API endpoints: /api/classifications, /api/classifications/latest')
+    print(f'📹 Video feed: /video_feed')
+    
     app.run(host=host, port=port, debug=False)
 
 if __name__ == '__main__':

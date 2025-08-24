@@ -18,6 +18,9 @@ class CameraNode(Node):
     def __init__(self):
         super().__init__('camera_node')
         
+        # Set logging level to INFO to reduce debug spam
+        self.get_logger().set_level(rclpy.logging.LoggingSeverity.INFO)
+        
         # Parameters
         self.declare_parameter('device_id', 0)
         self.declare_parameter('fps', 10.0)
@@ -39,16 +42,15 @@ class CameraNode(Node):
         self.thread = threading.Thread(target=self._publish_loop, daemon=True)
         self.thread.start()
         
-        # Remove manual signal handler - let ROS2 handle it
-        # signal.signal(signal.SIGINT, self._signal_handler)  # Remove this line
-        
-        self.get_logger().info(f'Camera node started with device /dev/video{self.device_id}')
+        self.get_logger().info('📷 Camera node started')
+        self.get_logger().info(f'🎯 Target device: /dev/video{self.device_id}')
+        self.get_logger().info(f'⚡ Target FPS: {self.fps}')
 
     def _init_camera(self):
         """Initialize camera source with better device handling"""
         # First try local device with proper V4L2 settings
         try:
-            self.get_logger().info(f'Trying to open /dev/video{self.device_id}...')
+            self.get_logger().info(f'🔍 Checking camera device /dev/video{self.device_id}...')
             
             # Test device access first
             if not os.path.exists(f'/dev/video{self.device_id}'):
@@ -67,9 +69,10 @@ class CameraNode(Node):
                 ret, test_frame = self.cap.read()
                 if ret and test_frame is not None:
                     self.get_logger().info('✅ Local camera connected and working')
+                    self.get_logger().info(f'📐 Frame size: {test_frame.shape[1]}x{test_frame.shape[0]}')
                     return
                 else:
-                    self.get_logger().warn('Device opened but cannot read frames')
+                    self.get_logger().warn('⚠️  Device opened but cannot read frames')
                     self.cap.release()
                     self.cap = None
             else:
@@ -77,18 +80,19 @@ class CameraNode(Node):
                 self.cap = None
                 
         except Exception as e:
-            self.get_logger().warn(f'Local camera failed: {e}')
+            self.get_logger().warn(f'⚠️  Local camera failed: {e}')
             if self.cap:
                 self.cap.release()
                 self.cap = None
         
         # Local camera failed - use mock
-        self.get_logger().warn('Using mock camera')
+        self.get_logger().warn('🔄 Falling back to mock camera mode')
         self.cap = None
 
     def _publish_loop(self):
         """Publishing loop with better error handling"""
         rate = 1.0 / self.fps
+        frame_count = 0
         
         while self._running and not self._shutdown_event.is_set():
             try:
@@ -98,78 +102,92 @@ class CameraNode(Node):
                     ret, frame = self.cap.read()
                     if not ret or frame is None:
                         if self._running:  # Only log if we're not shutting down
-                            self.get_logger().warn('Failed to read frame, reinitializing camera...')
-                        self._init_camera()
-                        frame = None
+                            self.get_logger().warn('⚠️  Failed to read frame from camera')
+                        continue
+                    
+                    # Convert frame to ROS2 Image message
+                    try:
+                        ros_image = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+                        ros_image.header.stamp = self.get_clock().now().to_msg()
+                        ros_image.header.frame_id = "camera_frame"
+                        
+                        # Publish
+                        self.publisher.publish(ros_image)
+                        frame_count += 1
+                        
+                        # Log every 30 frames (every 3 seconds at 10 FPS)
+                        if frame_count % 30 == 0:
+                            self.get_logger().info(f'📸 Published frame #{frame_count} ({frame.shape[1]}x{frame.shape[0]})')
+                        
+                    except Exception as e:
+                        self.get_logger().error(f'❌ Frame conversion failed: {e}')
+                        continue
+                        
+                else:
+                    # Mock camera mode - publish a simple test image
+                    if frame_count % 30 == 0:  # Log every 30 frames
+                        self.get_logger().debug('🖼️  Mock camera mode - no real camera available')
+                    
+                    # Create a simple test image
+                    test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    test_frame[:] = (100, 100, 100)  # Gray background
+                    
+                    # Add some text
+                    cv2.putText(test_frame, f'Mock Camera - Frame {frame_count}', 
+                               (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    
+                    try:
+                        ros_image = self.bridge.cv2_to_imgmsg(test_frame, "bgr8")
+                        ros_image.header.stamp = self.get_clock().now().to_msg()
+                        ros_image.header.frame_id = "mock_camera_frame"
+                        
+                        self.publisher.publish(ros_image)
+                        frame_count += 1
+                        
+                    except Exception as e:
+                        self.get_logger().error(f'❌ Mock frame conversion failed: {e}')
+                        continue
                 
-                if frame is None:
-                    frame = self._create_mock_frame()
-                
-                # Convert BGR to RGB and resize
-                frame = cv2.resize(frame, (640, 480))
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                
-                # Create ROS message
-                msg = self.bridge.cv2_to_imgmsg(rgb_frame, encoding='rgb8')
-                msg.header = Header()
-                msg.header.stamp = self.get_clock().now().to_msg()
-                msg.header.frame_id = 'camera_link'
-                
-                self.publisher.publish(msg)
-                
-                # Use shutdown event for interruptible sleep
-                if self._shutdown_event.wait(rate):
-                    break  # Shutdown requested
+                # Rate limiting
+                time.sleep(rate)
                 
             except Exception as e:
                 if self._running:  # Only log if we're not shutting down
-                    self.get_logger().error(f'Publishing error: {e}')
-                if self._shutdown_event.wait(0.5):
-                    break
+                    self.get_logger().error(f'❌ Publishing loop error: {e}')
+                time.sleep(rate)  # Continue trying
 
-    def _create_mock_frame(self):
-        """Create mock frame when camera unavailable"""
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(frame, "MOCK CAMERA", (200, 240), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, "Check /dev/video0", (180, 280), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        return frame
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals"""
+        self.get_logger().info('🛑 Shutdown signal received')
+        self._running = False
+        self._shutdown_event.set()
 
     def destroy_node(self):
         """Clean shutdown"""
-        self.get_logger().info('Shutting down camera node...')
+        self.get_logger().info('🛑 Camera node shutting down')
         self._running = False
         self._shutdown_event.set()
         
-        # Wait for thread to finish
-        if hasattr(self, 'thread') and self.thread.is_alive():
-            self.thread.join(timeout=2.0)
-        
-        # Release camera
-        if self.cap:
+        if self.cap and self.cap.isOpened():
             self.cap.release()
-            
+            self.get_logger().info('📷 Camera released')
+        
         super().destroy_node()
 
-def main():
-    rclpy.init()
-    node = None
+def main(args=None):
+    rclpy.init(args=args)
     
     try:
         node = CameraNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass  # Handle Ctrl+C gracefully
+        pass
     except ExternalShutdownException:
-        pass  # Handle ROS2 shutdown gracefully
+        pass
     finally:
-        if node:
+        if 'node' in locals():
             node.destroy_node()
-        try:
-            rclpy.shutdown()
-        except:
-            pass  # Already shutdown
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()
