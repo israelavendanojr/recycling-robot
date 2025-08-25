@@ -136,8 +136,14 @@ def main(args=None):
         print(f'Error in sorting node: {e}')
     finally:
         if 'node' in locals():
-            node.destroy_node()
-        rclpy.try_shutdown()
+            try:
+                node.destroy_node()
+            except Exception as e:
+                print(f'Error during node destruction: {e}')
+        try:
+            rclpy.shutdown()
+        except Exception as e:
+            print(f'Error during shutdown: {e}')
 
 if __name__ == '__main__':
     main()

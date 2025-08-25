@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask, jsonify, request, Response, send_from_directory
+from flask import Flask, jsonify, request, Response, send_from_directory, send_file
 from flask_cors import CORS
 import sqlite3
 import time
@@ -9,12 +9,15 @@ import threading
 from collections import defaultdict
 import subprocess
 import psutil
+from werkzeug.exceptions import NotFound
+
 
 app = Flask(__name__)
 CORS(app)
 
 # Environment
 DATABASE_PATH = './robot.db'  # Use local directory instead of /data
+FRAME_PATH = os.getenv('FRAME_PATH', '/shared/current_frame.jpg')
 
 # State
 events_cache = []
@@ -349,23 +352,41 @@ def get_latest_classification():
 
 @app.route('/api/current_image')
 def get_current_image():
-    """Get current image from ROS2 camera stream"""
+    """
+    Return JSON pointing to the latest JPEG URL with cache-busting.
+    Frontend can keep polling this endpoint; it will update image_url.
+    """
     try:
-        # Simulate ROS2 camera stream with timestamp-based image generation
-        current_time = time.time()
-        
-        # Generate a unique image URL based on timestamp for streaming effect
-        # In production, this would be the actual ROS2 camera topic URL
-        image_url = f'/api/ros2_camera_stream/{int(current_time * 10)}'
-        
+        if not os.path.exists(FRAME_PATH):
+            return jsonify({'success': False, 'error': 'no_frame'}), 404
+
+        mtime = int(os.path.getmtime(FRAME_PATH) * 1000)
         return jsonify({
             'success': True,
-            'image_url': image_url,
-            'timestamp': current_time,
+            'image_url': f'/api/current_frame.jpg?ts={mtime}',
+            'timestamp': time.time(),
             'source': 'ros2_camera'
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/current_frame.jpg')
+def serve_current_frame():
+    """
+    Serve the latest JPEG bytes saved by the mock/real camera.
+    """
+    try:
+        if not os.path.exists(FRAME_PATH):
+            raise NotFound("No current frame available")
+        # no-store avoids browser caching
+        resp = send_file(FRAME_PATH, mimetype='image/jpeg', as_attachment=False, max_age=0, conditional=False)
+        resp.headers['Cache-Control'] = 'no-store, max-age=0'
+        return resp
+    except NotFound as e:
+        return jsonify({'success': False, 'error': 'no_frame'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/ros2_camera_stream/<timestamp>')
 def serve_ros2_camera_stream(timestamp):
@@ -476,5 +497,5 @@ if __name__ == '__main__':
     health_thread.start()
     print("✅ Health checker started")
     
-    print("🌐 Starting Flask server on port 8001...")
-    app.run(host='0.0.0.0', port=8001, debug=False)
+    print("🌐 Starting Flask server on port 8000...")
+    app.run(host='0.0.0.0', port=8000, debug=False)

@@ -45,6 +45,7 @@ ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:$PYTHONPATH"
 RUN groupadd -r robot && useradd -r -g robot -G video robot
 RUN mkdir -p /workspace/ros2_ws && chown -R robot:robot /workspace
 RUN mkdir -p /home/robot && chown -R robot:robot /home/robot
+RUN mkdir -p /shared && chown -R robot:robot /shared
 ENV HOME=/home/robot
 
 # Install Python packages with compatible versions

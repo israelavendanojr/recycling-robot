@@ -124,10 +124,9 @@ class ClassifierNode(Node):
             
             # Check if model file exists
             if not os.path.exists(self.model_path):
-                self.get_logger().warn(f'⚠️  Model file not found: {self.model_path}')
-                self.get_logger().info('🔧 Using fallback model initialization...')
-                # Initialize a simple fallback model for testing
-                self.model = self._create_fallback_model()
+                self.get_logger().error(f'❌ Model file not found: {self.model_path}')
+                self.get_logger().error('❌ Cannot continue without model file')
+                self._running = False
                 return
             
             # Load the actual model
@@ -137,25 +136,8 @@ class ClassifierNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'❌ Failed to load model: {e}')
-            self.get_logger().info('🔧 Using fallback model...')
-            self.model = self._create_fallback_model()
-
-    def _create_fallback_model(self):
-        """Create a simple fallback model for testing"""
-        try:
-            # Simple linear model as fallback
-            model = torch.nn.Sequential(
-                torch.nn.Linear(224 * 224 * 3, 128),
-                torch.nn.ReLU(),
-                torch.nn.Linear(128, len(self.classes)),
-                torch.nn.Softmax(dim=1)
-            )
-            model.eval()
-            self.get_logger().info('🔧 Fallback model created for testing')
-            return model
-        except Exception as e:
-            self.get_logger().error(f'❌ Failed to create fallback model: {e}')
-            return None
+            self.get_logger().error('❌ Cannot continue without model')
+            self._running = False
 
     def _init_database(self):
         """Initialize SQLite database with clean logging"""
@@ -207,7 +189,7 @@ class ClassifierNode(Node):
                 result['class'],
                 result['confidence'],
                 json.dumps(result.get('raw_logits', [])),
-                'mock_camera'  # We'll update this when real camera is connected
+                'camera'  # Generic source since both mock and real publish to same topic
             ))
             
             conn.commit()
@@ -218,6 +200,31 @@ class ClassifierNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'❌ Database write failed: {e}')
+
+    def _send_to_backend(self, result):
+        """Send classification result to backend API"""
+        try:
+            # Prepare data for backend
+            backend_data = {
+                'class': result['class'],
+                'confidence': result['confidence'],
+                'timestamp': time.time()
+            }
+            
+            # Send POST request to backend
+            response = requests.post(
+                f'{self.api_base}/api/events',
+                json=backend_data,
+                timeout=5.0
+            )
+            
+            if response.status_code == 200:
+                self.get_logger().debug(f'✅ Sent to backend: {result["class"]} ({result["confidence"]*100:.1f}%)')
+            else:
+                self.get_logger().warn(f'⚠️  Backend responded with status {response.status_code}')
+                
+        except Exception as e:
+            self.get_logger().error(f'❌ Failed to send to backend: {e}')
 
     def _preprocess_image(self, compressed_image_msg):
         """Preprocess compressed image for model inference using PIL + Torch only"""
@@ -342,6 +349,9 @@ class ClassifierNode(Node):
             result_msg.data = json.dumps(result)
             self.classification_publisher.publish(result_msg)
             
+            # Send to backend API
+            self._send_to_backend(result)
+            
             # Log successful classification
             self.get_logger().info(f'[Classifier] Predicted: {predicted_class} ({confidence*100:.1f}% confidence)')
             
@@ -371,10 +381,18 @@ def main(args=None):
         pass
     except ExternalShutdownException:
         pass
+    except Exception as e:
+        print(f'Unexpected error: {e}')
     finally:
         if 'node' in locals():
-            node.destroy_node()
-        rclpy.try_shutdown()
+            try:
+                node.destroy_node()
+            except Exception as e:
+                print(f'Error during node destruction: {e}')
+        try:
+            rclpy.shutdown()
+        except Exception as e:
+            print(f'Error during shutdown: {e}')
 
 if __name__ == '__main__':
     main()

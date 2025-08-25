@@ -3,14 +3,25 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch.conditions import IfCondition, UnlessCondition
+from ament_index_python.packages import get_package_share_directory
 import os
 
 def generate_launch_description():
+    # Get the package share directory for default paths
+    package_share_dir = get_package_share_directory('recycling_robot')
+    default_images = os.path.join(package_share_dir, 'test_images')
+    
     # Launch arguments
-    use_mock_camera_arg = DeclareLaunchArgument(
-        'use_mock_camera',
+    use_real_camera_arg = DeclareLaunchArgument(
+        'use_real_camera',
         default_value='false',
-        description='Use mock camera instead of real camera'
+        description='Use real camera instead of mock camera'
+    )
+    
+    image_folder_arg = DeclareLaunchArgument(
+        'image_folder',
+        default_value=default_images,
+        description='Folder of test images for MockCameraNode'
     )
     
     backend_url_arg = DeclareLaunchArgument(
@@ -19,50 +30,37 @@ def generate_launch_description():
         description='Backend API base URL'
     )
     
-    web_host_arg = DeclareLaunchArgument(
-        'web_host',
-        default_value='0.0.0.0',
-        description='Host/interface for the Web Dashboard node'
-    )
-    
-    web_port_arg = DeclareLaunchArgument(
-        'web_port',
-        default_value='8080',
-        description='Port for the Web Dashboard node'
-    )
-    
     # Get the launch directory
     launch_dir = os.path.join(os.path.dirname(__file__))
     
     return LaunchDescription([
         # Launch arguments
-        use_mock_camera_arg,
+        use_real_camera_arg,
+        image_folder_arg,
         backend_url_arg,
-        web_host_arg,
-        web_port_arg,
         
-        # --- Mock Camera node (for testing) ---
+        # --- Mock Camera node (default) ---
         Node(
             package='recycling_robot',
             executable='mock_camera_node',
             name='mock_camera_node',
             output='screen',
-            condition=IfCondition(LaunchConfiguration('use_mock_camera')),
+            condition=UnlessCondition(LaunchConfiguration('use_real_camera')),
             parameters=[{
-                'image_folder': 'test_images',
+                'image_folder': LaunchConfiguration('image_folder'),
                 'publish_rate': 3.0,
                 'image_quality': 85,
                 'auto_fallback': True
             }]
         ),
         
-        # --- Real Camera node (alternative) ---
+        # --- Real Camera node (when use_real_camera=true) ---
         Node(
             package='recycling_robot',
             executable='camera_node',
             name='camera_node',
             output='screen',
-            condition=UnlessCondition(LaunchConfiguration('use_mock_camera')),
+            condition=IfCondition(LaunchConfiguration('use_real_camera')),
             parameters=[{
                 'device_id': 0,
                 'fps': 10.0
@@ -78,7 +76,8 @@ def generate_launch_description():
             parameters=[{
                 'api_base_url': LaunchConfiguration('backend_url'),
                 'inference_interval': 3.0,
-                'confidence_threshold': 0.7
+                'confidence_threshold': 0.7,
+                'model_path': 'src/recycling_robot/recycling_robot/models/recycler.pt'
             }]
         ),
 
@@ -90,18 +89,6 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'sorting_delay': 1.0
-            }]
-        ),
-
-        # --- Web Dashboard node ---
-        Node(
-            package='recycling_robot',
-            executable='web_node',   
-            name='simple_web',
-            output='screen',
-            parameters=[{
-                'host': LaunchConfiguration('web_host'),
-                'port': LaunchConfiguration('web_port')
             }]
         ),
     ])
