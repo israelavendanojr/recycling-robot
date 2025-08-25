@@ -23,6 +23,7 @@ services:
       - video
     devices:
       - "/dev/video0:/dev/video0"
+      - "/dev/video1:/dev/video1"
     environment:
       - API_BASE_URL=${API_BASE_URL}
     networks:

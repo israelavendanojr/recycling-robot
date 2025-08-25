@@ -9,7 +9,7 @@ def generate_launch_description():
     # Launch arguments
     use_mock_camera_arg = DeclareLaunchArgument(
         'use_mock_camera',
-        default_value='true',
+        default_value='false',
         description='Use mock camera instead of real camera'
     )
     

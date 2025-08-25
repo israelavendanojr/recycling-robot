@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     wget \
     v4l-utils \
+    udev \
     && rm -rf /var/lib/apt/lists/*
 
 # Add ROS2 repository and install ROS2 Humble

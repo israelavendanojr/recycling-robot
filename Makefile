@@ -7,24 +7,24 @@ help: ## Show this help message
 
 install: ## Install dependencies
 	@echo "📦 Installing dependencies..."
-	cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
 	cd web && npm install
 
 up: ## Start all services
 	@echo "🚀 Starting services..."
-	docker-compose up -d
+	docker compose up -d
 
 down: ## Stop all services
 	@echo "🛑 Stopping services..."
-	docker-compose down
+	docker compose down
 
 logs: ## Show service logs
 	@echo "📋 Showing logs..."
-	docker-compose logs -f
+	docker compose logs -f
 
 build: ## Build all services
 	@echo "🔨 Building services..."
-	docker-compose build
+	docker compose build
 
 clean: ## Clean up Docker resources
 	@echo "🧹 Cleaning up..."

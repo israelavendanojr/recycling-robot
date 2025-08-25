@@ -15,7 +15,7 @@ class MockCameraNode(Node):
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.INFO)
         
         # Parameters
-        self.declare_parameter('image_folder', 'test_images')
+        self.declare_parameter('image_folder', 'src/recycling_robot/recycling_robot/test_images')
         self.declare_parameter('publish_rate', 3.0)  # Publish every 3 seconds
         self.declare_parameter('image_quality', 85)  # JPEG quality
         self.declare_parameter('auto_fallback', True)  # Automatically use mock if no real camera
@@ -49,34 +49,69 @@ class MockCameraNode(Node):
         self.get_logger().info(f'[MockCamera] Found {len(self.test_images)} test images')
 
     def _load_test_images(self):
-        """Load test images from the specified folder"""
+        """Load test images from the specified folder - prioritize existing real images"""
         try:
-            # Get the full path to the test images folder
-            package_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            test_images_dir = os.path.join(package_dir, self.image_folder)
+            # First, try to find the absolute path to test_images folder
+            possible_paths = [
+                self.image_folder,  # Direct path as specified
+                os.path.join(os.getcwd(), self.image_folder),  # Relative to current working directory
+                os.path.join('/workspace/ros2_ws', self.image_folder),  # Docker workspace path
+                os.path.expanduser(f'~/{self.image_folder}'),  # User home directory
+            ]
             
-            if not os.path.exists(test_images_dir):
-                self.get_logger().warn(f'[WARN] Test images directory not found: {test_images_dir}')
-                self.get_logger().info('[MockCamera] Creating sample test images...')
+            test_images_dir = None
+            for path in possible_paths:
+                if os.path.exists(path) and os.path.isdir(path):
+                    test_images_dir = path
+                    break
+                    
+            if test_images_dir is None:
+                self.get_logger().error(f'[ERROR] Could not find test images directory. Tried:')
+                for path in possible_paths:
+                    self.get_logger().error(f'  - {path}')
+                # Fall back to creating samples
+                test_images_dir = os.path.join(os.getcwd(), 'test_images')
+                self.get_logger().warn(f'[WARN] Creating fallback directory: {test_images_dir}')
                 self._create_sample_images(test_images_dir)
             
             # Get list of image files
-            image_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+            image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
+            image_files = []
+            
             for filename in os.listdir(test_images_dir):
                 if any(filename.lower().endswith(ext) for ext in image_extensions):
-                    self.test_images.append(os.path.join(test_images_dir, filename))
+                    full_path = os.path.join(test_images_dir, filename)
+                    if os.path.isfile(full_path):
+                        image_files.append(full_path)
             
             # Sort images for consistent cycling
-            self.test_images.sort()
+            image_files.sort()
             
-            if not self.test_images:
-                self.get_logger().warn('[WARN] No test images found, creating sample images...')
+            if image_files:
+                self.test_images = image_files
+                self.get_logger().info(f'[MockCamera] Successfully loaded {len(self.test_images)} real test images')
+                for i, img_path in enumerate(self.test_images[:5]):  # Show first 5 images
+                    self.get_logger().info(f'  [{i+1}] {os.path.basename(img_path)}')
+                if len(self.test_images) > 5:
+                    self.get_logger().info(f'  ... and {len(self.test_images) - 5} more images')
+            else:
+                self.get_logger().warn('[WARN] No real test images found, creating sample images...')
                 self._create_sample_images(test_images_dir)
-                self._load_test_images()  # Reload after creating
+                # Reload after creating samples
+                for filename in os.listdir(test_images_dir):
+                    if any(filename.lower().endswith(ext) for ext in image_extensions):
+                        full_path = os.path.join(test_images_dir, filename)
+                        if os.path.isfile(full_path):
+                            self.test_images.append(full_path)
+                self.test_images.sort()
             
         except Exception as e:
             self.get_logger().error(f'[ERROR] Failed to load test images: {e}')
-            self._create_sample_images('test_images')
+            # Create fallback in current directory
+            fallback_dir = os.path.join(os.getcwd(), 'fallback_test_images')
+            self._create_sample_images(fallback_dir)
+            self.image_folder = fallback_dir
+            self._load_test_images()
 
     def _create_sample_images(self, directory):
         """Create sample test images if none exist"""
@@ -84,35 +119,50 @@ class MockCameraNode(Node):
             os.makedirs(directory, exist_ok=True)
             
             # Create a simple colored square image for testing
-            from PIL import Image, ImageDraw
+            from PIL import Image, ImageDraw, ImageFont
             
             # Create different colored squares for different materials
-            colors = [
-                (139, 69, 19),   # Brown (cardboard)
-                (100, 149, 237), # Blue (glass)
-                (192, 192, 192), # Silver (metal)
-                (34, 139, 34),   # Green (plastic)
-                (47, 79, 79)     # Dark (trash)
+            materials_colors = [
+                ('cardboard', (139, 69, 19)),   # Brown
+                ('glass', (100, 149, 237)),     # Blue
+                ('metal', (192, 192, 192)),     # Silver
+                ('plastic', (34, 139, 34)),     # Green
+                ('trash', (47, 79, 79))         # Dark gray
             ]
             
-            for i, color in enumerate(colors):
-                # Create 224x224 image (same size as model input)
-                img = Image.new('RGB', (224, 224), color)
+            for material, color in materials_colors:
+                # Create 640x480 image (common camera resolution)
+                img = Image.new('RGB', (640, 480), color)
                 draw = ImageDraw.Draw(img)
                 
-                # Add a simple pattern
-                draw.rectangle([50, 50, 174, 174], outline=(255, 255, 255), width=3)
+                # Add a border
+                draw.rectangle([10, 10, 630, 470], outline=(255, 255, 255), width=5)
                 
-                # Add text label
-                material_names = ['cardboard', 'glass', 'metal', 'plastic', 'trash']
-                draw.text((112, 200), material_names[i], fill=(255, 255, 255))
+                # Add material name
+                try:
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
+                except:
+                    font = ImageFont.load_default()
+                
+                # Center the text
+                text = material.upper()
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                x = (640 - text_width) // 2
+                y = (480 - text_height) // 2
+                
+                # Draw text with outline
+                for dx, dy in [(-2, -2), (-2, 2), (2, -2), (2, 2)]:
+                    draw.text((x+dx, y+dy), text, font=font, fill=(0, 0, 0))
+                draw.text((x, y), text, font=font, fill=(255, 255, 255))
                 
                 # Save image
-                filename = f'test_{material_names[i]}.jpg'
+                filename = f'sample_{material}.jpg'
                 filepath = os.path.join(directory, filename)
                 img.save(filepath, 'JPEG', quality=self.image_quality)
             
-            self.get_logger().info(f'[MockCamera] Created {len(colors)} sample test images in {directory}')
+            self.get_logger().info(f'[MockCamera] Created {len(materials_colors)} sample test images in {directory}')
             
         except Exception as e:
             self.get_logger().error(f'[ERROR] Failed to create sample images: {e}')
@@ -128,11 +178,17 @@ class MockCameraNode(Node):
             image_path = self.test_images[self.current_image_index]
             image_name = os.path.basename(image_path)
             
-            # Load and compress image
+            # Load and potentially resize image
             with Image.open(image_path) as img:
                 # Convert to RGB if necessary
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
+                
+                # Optionally resize very large images to prevent memory issues
+                max_size = (1920, 1080)
+                if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+                    img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    self.get_logger().debug(f'[MockCamera] Resized {image_name} to {img.size}')
                 
                 # Compress to JPEG
                 buffer = io.BytesIO()
@@ -144,18 +200,23 @@ class MockCameraNode(Node):
             msg.format = 'jpeg'
             msg.data = compressed_data
             
+            # Set timestamp
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = "mock_camera_frame"
+            
             # Publish
             self.image_publisher.publish(msg)
             
-            # Log every 10th image to reduce spam
-            if self.current_image_index % 10 == 0:
-                self.get_logger().info(f'[MockCamera] Published test image: {image_name}')
+            # Log current image being published
+            self.get_logger().info(f'[MockCamera] Published: {image_name} ({len(compressed_data)} bytes)')
             
             # Move to next image
             self.current_image_index = (self.current_image_index + 1) % len(self.test_images)
             
         except Exception as e:
             self.get_logger().error(f'[ERROR] Failed to publish test image: {e}')
+            # Skip to next image on error
+            self.current_image_index = (self.current_image_index + 1) % len(self.test_images) if self.test_images else 0
 
 def main(args=None):
     rclpy.init(args=args)

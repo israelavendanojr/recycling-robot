@@ -40,9 +40,18 @@ make up
 ### 3. Access Dashboard
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
-- **ROS2**: Running in container
+- **ROS2**: Running in container - 
+    docker compose exec ros2 bash
+    cd /workspace/ros2_ws
+    colcon build --symlink-install
+    source install/setup.bash
+    
+    source /opt/ros/humble/setup.bash
+    source /workspace/ros2_ws/install/setup.bash
 
-## 🛠️ Development Commands
+    ros2 launch recycling_robot robot.launch.py
+
+## Development Commands
 
 ```bash
 make help          # Show all available commands
