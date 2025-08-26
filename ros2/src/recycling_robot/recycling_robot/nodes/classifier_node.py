@@ -54,9 +54,9 @@ class ClassifierNode(Node):
         # Initialize SQLite database
         self._init_database()
         
-        self.get_logger().info('🚀 Classifier node started')
-        self.get_logger().info(f'📱 API endpoint: {self.api_base_url}')
-        self.get_logger().info(f'💻 Using device: {self.device}')
+        self.get_logger().info('[Classifier] Classifier node started')
+        self.get_logger().info(f'[Classifier] API endpoint: {self.api_base_url}')
+        self.get_logger().info(f'[Classifier] Using device: {self.device}')
         
         # Wait for backend before starting subscriptions and timers
         self._wait_for_backend()
@@ -76,9 +76,9 @@ class ClassifierNode(Node):
             
             # Auto-classify timer
             self.timer = self.create_timer(self.interval, self.auto_classify)
-            self.get_logger().info('✅ Backend ready, classification service active')
+            self.get_logger().info('[Classifier] Backend ready, classification service active')
         else:
-            self.get_logger().error('❌ Failed to start classification service - backend unavailable')
+            self.get_logger().error('[Classifier] Failed to start classification service - backend unavailable')
 
     def _wait_for_backend(self):
         """Wait for backend to be ready with exponential backoff"""
@@ -88,28 +88,28 @@ class ClassifierNode(Node):
         start_time = time.time()
         
         logged_waiting = False
-        self.get_logger().info('⏳ Waiting for backend to be ready...')
+        self.get_logger().info('[Classifier] Waiting for backend to be ready...')
         
         while self._running and not self._shutdown_event.is_set():
             try:
                 response = requests.get(f'{self.api_base_url}/api/health', timeout=5.0)
                 if response.status_code == 200:
                     self._backend_ready = True
-                    self.get_logger().info('✅ Backend is ready!')
+                    self.get_logger().info('[Classifier] Backend is ready!')
                     return
                 else:
                     if not logged_waiting:
-                        self.get_logger().info(f'⏳ Backend responded with status {response.status_code}, retrying...')
+                        self.get_logger().info(f'[Classifier] Backend responded with status {response.status_code}, retrying...')
                         logged_waiting = True
                         
             except requests.exceptions.RequestException as e:
                 if not logged_waiting:
-                    self.get_logger().info(f'⏳ Backend not responding: {e}, retrying...')
+                    self.get_logger().info(f'[Classifier] Backend not responding: {e}, retrying...')
                     logged_waiting = True
             
             # Check if we've exceeded max wait time
             if time.time() - start_time > max_wait_time:
-                self.get_logger().error(f'❌ Backend not ready after {max_wait_time}s, giving up')
+                self.get_logger().error(f'[Classifier] Backend not ready after {max_wait_time}s, giving up')
                 self._running = False
                 return
             
@@ -120,23 +120,23 @@ class ClassifierNode(Node):
     def _load_model(self):
         """Load PyTorch model with clean logging"""
         try:
-            self.get_logger().info('📦 Loading PyTorch model...')
+            self.get_logger().info('[Classifier] Loading PyTorch model...')
             
             # Check if model file exists
             if not os.path.exists(self.model_path):
-                self.get_logger().error(f'❌ Model file not found: {self.model_path}')
-                self.get_logger().error('❌ Cannot continue without model file')
+                self.get_logger().error(f'[Classifier] Model file not found: {self.model_path}')
+                self.get_logger().error('[Classifier] Cannot continue without model file')
                 self._running = False
                 return
             
             # Load the actual model
             self.model = torch.load(self.model_path, map_location=self.device)
             self.model.eval()
-            self.get_logger().info('✅ PyTorch model loaded successfully')
+            self.get_logger().info('[Classifier] PyTorch model loaded successfully')
             
         except Exception as e:
-            self.get_logger().error(f'❌ Failed to load model: {e}')
-            self.get_logger().error('❌ Cannot continue without model')
+            self.get_logger().error(f'[Classifier] Failed to load model: {e}')
+            self.get_logger().error('[Classifier] Cannot continue without model')
             self._running = False
 
     def _init_database(self):
@@ -165,10 +165,10 @@ class ClassifierNode(Node):
             conn.close()
             
             self.db_path = db_path
-            self.get_logger().info(f'💾 Database initialized: {db_path}')
+            self.get_logger().info(f'[Classifier] Database initialized: {db_path}')
             
         except Exception as e:
-            self.get_logger().error(f'❌ Database initialization failed: {e}')
+            self.get_logger().error(f'[Classifier] Database initialization failed: {e}')
             self.db_path = None
 
     def _log_to_database(self, result):
@@ -196,10 +196,10 @@ class ClassifierNode(Node):
             conn.close()
             
             # Only log successful database writes at DEBUG level
-            self.get_logger().debug(f'💾 Logged to database: {result["class"]} ({result["confidence"]*100:.1f}%)')
+            self.get_logger().debug(f'[Classifier] Logged to database: {result["class"]} ({result["confidence"]*100:.1f}%)')
             
         except Exception as e:
-            self.get_logger().error(f'❌ Database write failed: {e}')
+            self.get_logger().error(f'[Classifier] Database write failed: {e}')
 
     def _send_to_backend(self, result):
         """Send classification result to backend API"""
@@ -219,19 +219,19 @@ class ClassifierNode(Node):
             )
             
             if response.status_code == 200:
-                self.get_logger().debug(f'✅ Sent to backend: {result["class"]} ({result["confidence"]*100:.1f}%)')
+                self.get_logger().debug(f'[Classifier] Sent to backend: {result["class"]} ({result["confidence"]*100:.1f}%)')
             else:
-                self.get_logger().warn(f'⚠️  Backend responded with status {response.status_code}')
+                self.get_logger().warn(f'[Classifier] Backend responded with status {response.status_code}')
                 
         except Exception as e:
-            self.get_logger().error(f'❌ Failed to send to backend: {e}')
+            self.get_logger().error(f'[Classifier] Failed to send to backend: {e}')
 
     def _preprocess_image(self, compressed_image_msg):
         """Preprocess compressed image for model inference using PIL + Torch only"""
         try:
             # Extract image data from CompressedImage message
             if compressed_image_msg.format != 'jpeg':
-                self.get_logger().warn(f'⚠️  Unsupported image format: {compressed_image_msg.format}')
+                self.get_logger().warn(f'[Classifier] Unsupported image format: {compressed_image_msg.format}')
                 return None
             
             # Convert compressed image data to PIL Image
@@ -273,11 +273,11 @@ class ClassifierNode(Node):
             tensor = tensor.unsqueeze(0)
             
             # Only log preprocessing at DEBUG level
-            self.get_logger().debug(f'🖼️  Image preprocessed: {pil_image.size[0]}x{pil_image.size[1]} → {tensor.shape}')
+            self.get_logger().debug(f'[Classifier] Image preprocessed: {pil_image.size[0]}x{pil_image.size[1]} -> {tensor.shape}')
             return tensor.to(self.device)
             
         except Exception as e:
-            self.get_logger().error(f'❌ Image preprocessing failed: {e}')
+            self.get_logger().error(f'[Classifier] Image preprocessing failed: {e}')
             return None
 
     def _run_inference(self, image_tensor):
@@ -302,16 +302,16 @@ class ClassifierNode(Node):
                 return predicted_class, confidence
                 
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Inference failed: {e}')
+            self.get_logger().error(f'[Classifier] Inference failed: {e}')
             return None, 0.0
 
     def image_callback(self, msg):
         """Handle incoming image messages with clean logging"""
         try:
             self.latest_image = msg
-            self.get_logger().debug('[DEBUG] Received image from camera')
+            self.get_logger().debug('[Classifier] Received image from camera')
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Image callback error: {e}')
+            self.get_logger().error(f'[Classifier] Image callback error: {e}')
 
     def auto_classify(self):
         """Auto-classify latest image with clean logging"""
@@ -331,7 +331,7 @@ class ClassifierNode(Node):
             
             # Check confidence threshold
             if confidence < self.threshold:
-                self.get_logger().debug(f'[DEBUG] Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
+                self.get_logger().debug(f'[Classifier] Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
                 return
             
             # Create result
@@ -356,23 +356,25 @@ class ClassifierNode(Node):
             self.get_logger().info(f'[Classifier] Predicted: {predicted_class} ({confidence*100:.1f}% confidence)')
             
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Auto-classify failed: {e}')
+            self.get_logger().error(f'[Classifier] Auto-classify failed: {e}')
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""
-        self.get_logger().info('[INFO] Shutdown signal received')
+        self.get_logger().info('[Classifier] Shutdown signal received')
         self._running = False
         self._shutdown_event.set()
 
     def destroy_node(self):
         """Clean shutdown"""
-        self.get_logger().info('[INFO] Classifier node shutting down')
+        self.get_logger().info('[Classifier] Classifier node shutting down')
         self._running = False
         self._shutdown_event.set()
         super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
+    node = None
+    ros_shutdown_called = False
     
     try:
         node = ClassifierNode()
@@ -384,15 +386,18 @@ def main(args=None):
     except Exception as e:
         print(f'Unexpected error: {e}')
     finally:
-        if 'node' in locals():
+        if node:
             try:
                 node.destroy_node()
             except Exception as e:
                 print(f'Error during node destruction: {e}')
         try:
-            rclpy.shutdown()
+            if not ros_shutdown_called:
+                rclpy.shutdown()
+                ros_shutdown_called = True
         except Exception as e:
-            print(f'Error during shutdown: {e}')
+            if "rcl_shutdown already called" not in str(e):
+                print(f'Error during shutdown: {e}')
 
 if __name__ == '__main__':
     main()

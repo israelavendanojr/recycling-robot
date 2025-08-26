@@ -47,10 +47,10 @@ class CameraNode(Node):
         self.thread = threading.Thread(target=self._publish_loop, daemon=True)
         self.thread.start()
         
-        self.get_logger().info('📷 Real Camera node started')
-        self.get_logger().info(f'🎯 Target device: /dev/video{self.device_id}')
-        self.get_logger().info(f'⚡ Target FPS: {self.fps}')
-        self.get_logger().info(f'📐 Target resolution: {self.width}x{self.height}')
+        self.get_logger().info('[Camera] Real Camera node started')
+        self.get_logger().info(f'[Camera] Target device: /dev/video{self.device_id}')
+        self.get_logger().info(f'[Camera] Target FPS: {self.fps}')
+        self.get_logger().info(f'[Camera] Target resolution: {self.width}x{self.height}')
 
     def _detect_cameras(self):
         """Detect available camera devices"""
@@ -66,7 +66,7 @@ class CameraNode(Node):
                         ret, frame = cap.read()
                         if ret and frame is not None:
                             available_devices.append(i)
-                            self.get_logger().info(f'🔍 Found working camera: /dev/video{i}')
+                            self.get_logger().info(f'[Camera] Found working camera: /dev/video{i}')
                     cap.release()
                 except:
                     pass
@@ -74,11 +74,11 @@ class CameraNode(Node):
 
     def _init_camera(self):
         """Initialize camera source with better device handling"""
-        self.get_logger().info('🔍 Detecting available cameras...')
+        self.get_logger().info('[Camera] Detecting available cameras...')
         available_devices = self._detect_cameras()
         
         if not available_devices:
-            self.get_logger().warn('⚠️  No working cameras found')
+            self.get_logger().warn('[Camera] No working cameras found')
             self.cap = None
             return
         
@@ -87,13 +87,13 @@ class CameraNode(Node):
         
         for device_id in devices_to_try:
             try:
-                self.get_logger().info(f'🔌 Trying camera /dev/video{device_id}...')
+                self.get_logger().info(f'[Camera] Trying camera /dev/video{device_id}...')
                 
                 # Initialize with V4L2 backend for better Linux support
                 self.cap = cv2.VideoCapture(device_id, cv2.CAP_V4L2)
                 
                 if not self.cap.isOpened():
-                    self.get_logger().warn(f'⚠️  Could not open /dev/video{device_id}')
+                    self.get_logger().warn(f'[Camera] Could not open /dev/video{device_id}')
                     continue
                 
                 # Set camera properties
@@ -112,27 +112,27 @@ class CameraNode(Node):
                 # Test frame capture
                 ret, test_frame = self.cap.read()
                 if ret and test_frame is not None:
-                    self.get_logger().info(f'✅ Camera /dev/video{device_id} initialized successfully!')
-                    self.get_logger().info(f'📐 Actual resolution: {actual_width}x{actual_height}')
-                    self.get_logger().info(f'⚡ Actual FPS: {actual_fps:.1f}')
-                    self.get_logger().info(f'🖼️  Test frame shape: {test_frame.shape}')
+                    self.get_logger().info(f'[Camera] Camera /dev/video{device_id} initialized successfully!')
+                    self.get_logger().info(f'[Camera] Actual resolution: {actual_width}x{actual_height}')
+                    self.get_logger().info(f'[Camera] Actual FPS: {actual_fps:.1f}')
+                    self.get_logger().info(f'[Camera] Test frame shape: {test_frame.shape}')
                     
                     # Update our device_id to the working one
                     self.device_id = device_id
                     return
                 else:
-                    self.get_logger().warn(f'⚠️  /dev/video{device_id} opened but cannot read frames')
+                    self.get_logger().warn(f'[Camera] /dev/video{device_id} opened but cannot read frames')
                     self.cap.release()
                     self.cap = None
                     
             except Exception as e:
-                self.get_logger().warn(f'⚠️  Failed to initialize /dev/video{device_id}: {e}')
+                self.get_logger().warn(f'[Camera] Failed to initialize /dev/video{device_id}: {e}')
                 if self.cap:
                     self.cap.release()
                     self.cap = None
         
         # All cameras failed
-        self.get_logger().error('❌ Could not initialize any camera')
+        self.get_logger().error('[Camera] Could not initialize any camera')
         self.cap = None
 
     def _publish_loop(self):
@@ -147,7 +147,7 @@ class CameraNode(Node):
                     ret, frame = self.cap.read()
                     if not ret or frame is None:
                         if self._running:
-                            self.get_logger().warn('⚠️  Failed to read frame from camera')
+                            self.get_logger().warn('[Camera] Failed to read frame from camera')
                             # Try to reinitialize camera
                             self._init_camera()
                         continue
@@ -177,17 +177,17 @@ class CameraNode(Node):
                         # Log every 30 frames (every ~3 seconds at 10 FPS) or every 10 seconds
                         current_time = time.time()
                         if frame_count % 30 == 0 or (current_time - last_log_time) > 10:
-                            self.get_logger().info(f'📸 Published frame #{frame_count} ({len(compressed_data)} bytes, {frame.shape[1]}x{frame.shape[0]})')
+                            self.get_logger().info(f'[Camera] Published frame #{frame_count} ({len(compressed_data)} bytes, {frame.shape[1]}x{frame.shape[0]})')
                             last_log_time = current_time
                         
                     except Exception as e:
-                        self.get_logger().error(f'❌ Frame compression failed: {e}')
+                        self.get_logger().error(f'[Camera] Frame compression failed: {e}')
                         continue
                         
                 else:
                     # No camera available
                     if frame_count % 30 == 0:
-                        self.get_logger().warn('⚠️  No camera available - waiting...')
+                        self.get_logger().warn('[Camera] No camera available - waiting...')
                         # Try to reinitialize every 30 attempts
                         self._init_camera()
                     frame_count += 1
@@ -197,29 +197,31 @@ class CameraNode(Node):
                 
             except Exception as e:
                 if self._running:
-                    self.get_logger().error(f'❌ Publishing loop error: {e}')
+                    self.get_logger().error(f'[Camera] Publishing loop error: {e}')
                 time.sleep(rate)
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""
-        self.get_logger().info('🛑 Shutdown signal received')
+        self.get_logger().info('[Camera] Shutdown signal received')
         self._running = False
         self._shutdown_event.set()
 
     def destroy_node(self):
         """Clean shutdown"""
-        self.get_logger().info('🛑 Camera node shutting down')
+        self.get_logger().info('[Camera] Camera node shutting down')
         self._running = False
         self._shutdown_event.set()
         
         if self.cap and self.cap.isOpened():
             self.cap.release()
-            self.get_logger().info('📷 Camera released')
+            self.get_logger().info('[Camera] Camera released')
         
         super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
+    node = None
+    ros_shutdown_called = False
     
     try:
         node = CameraNode()
@@ -231,15 +233,18 @@ def main(args=None):
     except Exception as e:
         print(f'Unexpected error: {e}')
     finally:
-        if 'node' in locals():
+        if node:
             try:
                 node.destroy_node()
             except Exception as e:
                 print(f'Error during node destruction: {e}')
         try:
-            rclpy.shutdown()
+            if not ros_shutdown_called:
+                rclpy.shutdown()
+                ros_shutdown_called = True
         except Exception as e:
-            print(f'Error during shutdown: {e}')
+            if "rcl_shutdown already called" not in str(e):
+                print(f'Error during shutdown: {e}')
 
 if __name__ == '__main__':
     main()

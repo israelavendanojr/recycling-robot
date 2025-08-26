@@ -61,7 +61,7 @@ class MockCameraNode(Node):
             ]
             img_dir = next((p for p in candidates if os.path.isdir(p)), None)
             if img_dir is None:
-                self.get_logger().error('[ERROR] Could not find test images directory. Creating fallback.')
+                self.get_logger().error('[MockCamera] Could not find test images directory. Creating fallback.')
                 img_dir = os.path.join(os.getcwd(), 'test_images')
                 os.makedirs(img_dir, exist_ok=True)
                 self._create_sample_images(img_dir)
@@ -69,7 +69,7 @@ class MockCameraNode(Node):
             exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp')
             files = [os.path.join(img_dir, f) for f in sorted(os.listdir(img_dir)) if f.lower().endswith(exts)]
             if not files:
-                self.get_logger().warn('[WARN] No real test images found, creating samples...')
+                self.get_logger().warn('[MockCamera] No real test images found, creating samples...')
                 self._create_sample_images(img_dir)
                 files = [os.path.join(img_dir, f) for f in sorted(os.listdir(img_dir)) if f.lower().endswith(exts)]
 
@@ -79,7 +79,7 @@ class MockCameraNode(Node):
                 for i, p in enumerate(files[:5]):
                     self.get_logger().info(f'  [{i+1}] {os.path.basename(p)}')
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Failed to load test images: {e}')
+            self.get_logger().error(f'[MockCamera] Failed to load test images: {e}')
             self.test_images = []
 
     def _create_sample_images(self, directory):
@@ -126,7 +126,7 @@ class MockCameraNode(Node):
     def publish_test_image(self):
         try:
             if not self.test_images:
-                self.get_logger().warn('[WARN] No test images available')
+                self.get_logger().warn('[MockCamera] No test images available')
                 return
 
             path = self.test_images[self.current_image_index]
@@ -157,12 +157,14 @@ class MockCameraNode(Node):
             self.current_image_index = (self.current_image_index + 1) % len(self.test_images)
 
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Failed to publish test image: {e}')
+            self.get_logger().error(f'[MockCamera] Failed to publish test image: {e}')
             self.current_image_index = (self.current_image_index + 1) % max(1, len(self.test_images))
 
 def main(args=None):
     rclpy.init(args=args)
     node = None
+    ros_shutdown_called = False
+    
     try:
         node = MockCameraNode()
         rclpy.spin(node)
@@ -170,10 +172,17 @@ def main(args=None):
         pass
     finally:
         if node:
-            try: node.destroy_node()
-            except Exception: pass
-        try: rclpy.shutdown()
-        except Exception: pass
+            try: 
+                node.destroy_node()
+            except Exception: 
+                pass
+        try: 
+            if not ros_shutdown_called:
+                rclpy.shutdown()
+                ros_shutdown_called = True
+        except Exception as e:
+            if "rcl_shutdown already called" not in str(e):
+                print(f'Error during shutdown: {e}')
 
 if __name__ == '__main__':
     main()

@@ -18,7 +18,6 @@ setup(
     ],
     install_requires=[
         'setuptools', 
-        'requests', 
         'opencv-python', 
         'torch', 
         'torchvision', 

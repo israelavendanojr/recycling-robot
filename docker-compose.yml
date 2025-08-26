@@ -20,9 +20,7 @@ services:
       - ./ros2/src:/workspace/ros2_ws/src
       - shared_data:/data
       - shared_frames:/shared  # Shared volume for camera frames
-      - /var/run/pigpiod.if:/var/run/pigpiod.if
     privileged: true
-    user: robot
     network_mode: host
     group_add:
       - video
@@ -30,25 +28,9 @@ services:
     devices:
       - "/dev/video0:/dev/video0"
       - "/dev/video1:/dev/video1"
-      - "/dev/mem:/dev/mem"
       - "/dev/gpiomem:/dev/gpiomem"
-      - "/dev/gpiomem0:/dev/gpiomem0"
-      - "/dev/gpiomem1:/dev/gpiomem1"
-      - "/dev/gpiomem2:/dev/gpiomem2"
-      - "/dev/gpiomem3:/dev/gpiomem3"
-      - "/dev/gpiomem4:/dev/gpiomem4"
-      - "/dev/gpiochip0:/dev/gpiochip0"
-      - "/dev/gpiochip10:/dev/gpiochip10"
-      - "/dev/gpiochip11:/dev/gpiochip11"
-      - "/dev/gpiochip12:/dev/gpiochip12"
-      - "/dev/gpiochip13:/dev/gpiochip13"
     environment:
       - API_BASE_URL=http://localhost:8000
-      - GPIOZERO_PIN_FACTORY=rpigpio
-      - RPI_GPIO_PWM_FREQ=1000
-      - HOST_GPIO_URL=http://localhost:5001
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
     command: ["tail", "-f", "/dev/null"]

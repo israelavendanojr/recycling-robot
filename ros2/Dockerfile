@@ -58,7 +58,6 @@ RUN pip install --no-cache-dir \
     torch==2.0.1 \
     torchvision==0.15.2 \
     Pillow==11.3.0 \
-    requests==2.28.1 \
     flask==2.2.2 \
     flask-cors==3.0.10 \
     werkzeug==2.2.2 \

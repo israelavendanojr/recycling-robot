@@ -32,16 +32,8 @@ class SortingNode(Node):
         self.latest_classification = None
         self.sorting_busy = False
         
-        self.get_logger().info('🚀 Sorting node started')
-        self.get_logger().info(f'⏱️  Sorting delay: {self.sorting_delay}s')
-        
-        # Log available sorting actions
-        self.get_logger().info('📋 Available sorting actions:')
-        self.get_logger().info('  🔵 cardboard → Bin 1 (Blue)')
-        self.get_logger().info('  🟢 glass → Bin 2 (Green)')
-        self.get_logger().info('  🟡 metal → Bin 3 (Yellow)')
-        self.get_logger().info('  🔴 plastic → Bin 4 (Red)')
-        self.get_logger().info('  ⚫ trash → Bin 5 (Black)')
+        self.get_logger().info('[SortingNode] Sorting node started')
+        self.get_logger().info(f'[SortingNode] Processing delay: {self.sorting_delay}s')
 
     def classification_callback(self, msg):
         """Handle incoming classification results"""
@@ -50,20 +42,20 @@ class SortingNode(Node):
             classification = json.loads(msg.data)
             self.latest_classification = classification
             
-            self.get_logger().info(f'[Sorting] Received: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
+            self.get_logger().info(f'[SortingNode] Classification: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
             
             # Trigger sorting action
             self._perform_sorting(classification)
             
         except json.JSONDecodeError as e:
-            self.get_logger().error(f'[ERROR] Failed to parse classification message: {e}')
+            self.get_logger().error(f'[SortingNode] Failed to parse classification message: {e}')
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Error processing classification: {e}')
+            self.get_logger().error(f'[SortingNode] Error processing classification: {e}')
 
     def _perform_sorting(self, classification):
         """Perform the sorting action based on classification"""
         if self.sorting_busy:
-            self.get_logger().warn('[WARN] Sorting already in progress, skipping')
+            self.get_logger().warn('[SortingNode] Already in progress, skipping')
             return
         
         self.sorting_busy = True
@@ -76,9 +68,7 @@ class SortingNode(Node):
             sorting_action = self._get_sorting_action(material_class)
             
             if sorting_action:
-                self.get_logger().info(f'[Sorting] SORTING: {material_class.upper()} → {sorting_action}')
-                self.get_logger().info(f'   Confidence: {confidence*100:.1f}%')
-                self.get_logger().info(f'   Action: {self._describe_action(sorting_action)}')
+                self.get_logger().info(f'[SortingNode] Processing: {material_class.upper()}')
                 
                 # Simulate sorting delay
                 time.sleep(self.sorting_delay)
@@ -87,13 +77,13 @@ class SortingNode(Node):
                 self._control_actuator(sorting_action)
                 
                 # Log completion
-                self.get_logger().info(f'[Sorting] Sorting completed: {material_class} → {sorting_action}')
+                self.get_logger().info(f'[SortingNode] Processing completed: {material_class}')
                 
             else:
-                self.get_logger().warn(f'[WARN] Unknown material class: {material_class}')
+                self.get_logger().warn(f'[SortingNode] Unknown material class: {material_class}')
                 
         except Exception as e:
-            self.get_logger().error(f'[ERROR] Sorting action failed: {e}')
+            self.get_logger().error(f'[SortingNode] Processing failed: {e}')
         finally:
             self.sorting_busy = False
 
@@ -120,27 +110,21 @@ class SortingNode(Node):
         return action_descriptions.get(action, 'Unknown action')
 
     def _control_actuator(self, action):
-            bin_map = {
-                'BIN_1': 0,  # cardboard - Blue
-                'BIN_2': 1,  # glass - Green  
-                'BIN_3': 2,  # metal - Yellow
-                'BIN_4': 3,  # plastic - Red
-                'BIN_5': 4   # trash - Black
-            }
-
-            if action in bin_map:
-                target = bin_map[action]
-                self.get_logger().info(f'[Motor] Moving chute to bin {target}')
-                try:
-                    self.motor.move_to_bin(target)
-                    self.get_logger().info(f'[Motor] Successfully moved to bin {target}')
-                except Exception as e:
-                    self.get_logger().error(f'[ERROR] Motor failed: {e}')
-            else:
-                self.get_logger().warn(f'[WARN] Invalid action: {action}')
+        """Simple motor control - just spin for 1 second on any classification"""
+        self.get_logger().info(f'[Motor] Starting motor for classification: {action}')
+        try:
+            self.motor.forward(0.8)
+            time.sleep(1)
+            self.motor.stop()
+            self.get_logger().info('[Motor] Motor cycle completed')
+        except Exception as e:
+            self.get_logger().error(f'[Motor] Motor failed: {e}')
 def main(args=None):
     rclpy.init(args=args)
     node = SortingNode()
+    
+    # Track ROS shutdown state to prevent duplicate calls
+    ros_shutdown_called = False
 
     try:
         rclpy.spin(node)
@@ -162,13 +146,13 @@ def main(args=None):
             print(f'Error during node destruction: {e}')
 
         try:
-            rclpy.shutdown()
+            if not ros_shutdown_called:
+                rclpy.shutdown()
+                ros_shutdown_called = True
         except Exception as e:
-            print(f'Error during ROS shutdown: {e}')
+            if "rcl_shutdown already called" not in str(e):
+                print(f'Error during ROS shutdown: {e}')
 
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
