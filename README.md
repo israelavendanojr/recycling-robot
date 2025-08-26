@@ -37,6 +37,13 @@ make install
 make up
 ```
 
+### 3. ROS2 Launch
+```bash
+docker compose exec ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && source install/setup.bash && timeout 30s ros2 launch recycling_robot robot.launch.py"
+```
+
+
+
 ### 3. Access Dashboard
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
@@ -50,6 +57,9 @@ make up
     source /workspace/ros2_ws/install/setup.bash
 
     ros2 launch recycling_robot robot.launch.py
+
+
+    docker compose exec ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && source install/setup.bash && timeout 30s ros2 launch recycling_robot robot.launch.py"
 
 ## Development Commands
 
