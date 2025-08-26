@@ -32,7 +32,7 @@ class ClassifierNode(Node):
         self.declare_parameter('model_path', 'src/recycling_robot/recycling_robot/models/recycler.pt')
         
         # Get API URL from environment or parameter
-        self.api_base = os.getenv("API_BASE_URL", self.get_parameter("api_base_url").value)
+        self.api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8000')
         self.interval = self.get_parameter('inference_interval').value
         self.threshold = self.get_parameter('confidence_threshold').value
         self.model_path = self.get_parameter('model_path').value
@@ -55,7 +55,7 @@ class ClassifierNode(Node):
         self._init_database()
         
         self.get_logger().info('🚀 Classifier node started')
-        self.get_logger().info(f'📱 API endpoint: {self.api_base}')
+        self.get_logger().info(f'📱 API endpoint: {self.api_base_url}')
         self.get_logger().info(f'💻 Using device: {self.device}')
         
         # Wait for backend before starting subscriptions and timers
@@ -92,7 +92,7 @@ class ClassifierNode(Node):
         
         while self._running and not self._shutdown_event.is_set():
             try:
-                response = requests.get(f'{self.api_base}/api/health', timeout=5.0)
+                response = requests.get(f'{self.api_base_url}/api/health', timeout=5.0)
                 if response.status_code == 200:
                     self._backend_ready = True
                     self.get_logger().info('✅ Backend is ready!')
@@ -213,7 +213,7 @@ class ClassifierNode(Node):
             
             # Send POST request to backend
             response = requests.post(
-                f'{self.api_base}/api/events',
+                f'{self.api_base_url}/api/events',
                 json=backend_data,
                 timeout=5.0
             )

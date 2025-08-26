@@ -36,13 +36,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install cv-bridge for ROS2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-cv-bridge \
+    python3-rpi.gpio \
+    python3-gpiozero \
+    python3-pigpio \
     && rm -rf /var/lib/apt/lists/*
 
 # Force pip packages to take precedence over system packages
 ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:$PYTHONPATH"
 
 # Create a user with video group access
-RUN groupadd -r robot && useradd -r -g robot -G video robot
+RUN groupadd -r gpio && groupadd -r robot && useradd -r -g robot -G video,gpio robot
 RUN mkdir -p /workspace/ros2_ws && chown -R robot:robot /workspace
 RUN mkdir -p /home/robot && chown -R robot:robot /home/robot
 RUN mkdir -p /shared && chown -R robot:robot /shared

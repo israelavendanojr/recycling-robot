@@ -4,10 +4,12 @@ from rclpy.node import Node
 from std_msgs.msg import String
 import json
 import time
+from recycling_robot.utils.motor_controller import MotorController
 
 class SortingNode(Node):
     def __init__(self):
         super().__init__('sorting_node')
+        self.motor = MotorController()
         
         # Set logging level to INFO to reduce debug spam
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.INFO)
@@ -81,11 +83,11 @@ class SortingNode(Node):
                 # Simulate sorting delay
                 time.sleep(self.sorting_delay)
                 
+                # Control the motor to move to the target bin
+                self._control_actuator(sorting_action)
+                
                 # Log completion
                 self.get_logger().info(f'[Sorting] Sorting completed: {material_class} → {sorting_action}')
-                
-                # TODO: Add actual actuator control here
-                # self._control_actuator(sorting_action)
                 
             else:
                 self.get_logger().warn(f'[WARN] Unknown material class: {material_class}')
@@ -118,32 +120,55 @@ class SortingNode(Node):
         return action_descriptions.get(action, 'Unknown action')
 
     def _control_actuator(self, action):
-        """Control the physical sorting actuator (placeholder for future implementation)"""
-        # TODO: Implement actual actuator control
-        # This will be implemented when you add motors/actuators
-        self.get_logger().info(f'[Actuator] Actuator control: {action}')
-        pass
+            bin_map = {
+                'BIN_1': 0,  # cardboard - Blue
+                'BIN_2': 1,  # glass - Green  
+                'BIN_3': 2,  # metal - Yellow
+                'BIN_4': 3,  # plastic - Red
+                'BIN_5': 4   # trash - Black
+            }
 
+            if action in bin_map:
+                target = bin_map[action]
+                self.get_logger().info(f'[Motor] Moving chute to bin {target}')
+                try:
+                    self.motor.move_to_bin(target)
+                    self.get_logger().info(f'[Motor] Successfully moved to bin {target}')
+                except Exception as e:
+                    self.get_logger().error(f'[ERROR] Motor failed: {e}')
+            else:
+                self.get_logger().warn(f'[WARN] Invalid action: {action}')
 def main(args=None):
     rclpy.init(args=args)
-    
+    node = SortingNode()
+
     try:
-        node = SortingNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f'Error in sorting node: {e}')
+        node.get_logger().error(f'Error in sorting node: {e}')
     finally:
-        if 'node' in locals():
-            try:
-                node.destroy_node()
-            except Exception as e:
-                print(f'Error during node destruction: {e}')
+        # Always cleanup motor + node
+        try:
+            if hasattr(node, 'motor'):
+                node.motor.cleanup()
+        except Exception as e:
+            print(f'Error during motor cleanup: {e}')
+
+        try:
+            node.destroy_node()
+        except Exception as e:
+            print(f'Error during node destruction: {e}')
+
         try:
             rclpy.shutdown()
         except Exception as e:
-            print(f'Error during shutdown: {e}')
+            print(f'Error during ROS shutdown: {e}')
+
+
+if __name__ == '__main__':
+    main()
 
 if __name__ == '__main__':
     main()
