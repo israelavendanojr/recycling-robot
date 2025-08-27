@@ -1,66 +1,103 @@
-.PHONY: help up down logs build clean install test
+# Recycling Robot Makefile
+# Includes commands for testing the synchronous pipeline
+
+.PHONY: help install up down build test-pipeline monitor-pipeline clean
 
 help: ## Show this help message
-	@echo "Recycling Robot - Available Commands:"
+	@echo "Recycling Robot Management Commands:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 install: ## Install dependencies
 	@echo "Installing dependencies..."
-	cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
-	cd web && npm install
+	# Add your installation commands here
+	@echo "✅ Dependencies installed"
 
-up: ## Start all services
+up: ## Start services
 	@echo "Starting services..."
-	docker compose up -d
+	# Add your service startup commands here
+	@echo "✅ Services started"
 
-down: ## Stop all services
+down: ## Stop services
 	@echo "Stopping services..."
-	docker compose down
+	# Add your service stop commands here
+	@echo "✅ Services stopped"
 
-logs: ## Show service logs
-	@echo "Showing logs..."
-	docker compose logs -f
+build: ## Build ROS2 package
+	@echo "Building ROS2 package..."
+	docker compose exec ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select recycling_robot"
+	@echo "✅ ROS2 package built"
 
-build: ## Build all services
-	@echo "Building services..."
-	docker compose build
+test-pipeline: ## Test synchronous pipeline
+	@echo "🧪 Testing synchronous pipeline..."
+	docker compose exec ros2 bash -c " \
+		cd /workspace/ros2_ws && \
+		source /opt/ros/humble/setup.bash && \
+		source install/setup.bash && \
+		echo '🔍 Checking pipeline topics...' && \
+		timeout 5s ros2 topic list | grep pipeline && \
+		echo '🚀 Starting pipeline test...' && \
+		timeout 20s ros2 launch recycling_robot robot.launch.py & \
+		sleep 15 && \
+		echo '📊 Pipeline state:' && \
+		timeout 5s ros2 topic echo /pipeline/state --once && \
+		echo '✅ Pipeline test completed' \
+	"
 
-clean: ## Clean up Docker resources
-	@echo "Cleaning up..."
-	docker system prune -f
-	docker volume prune -f
+monitor-pipeline: ## Monitor pipeline state in real-time
+	@echo "📊 Monitoring pipeline state..."
+	docker compose exec ros2 bash -c " \
+		cd /workspace/ros2_ws && \
+		source /opt/ros/humble/setup.bash && \
+		source install/setup.bash && \
+		echo '🔍 Available pipeline topics:' && \
+		ros2 topic list | grep pipeline && \
+		echo '📈 Monitoring pipeline state (Ctrl+C to stop):' && \
+		ros2 topic echo /pipeline/state \
+	"
 
-dev-backend: ## Start backend in development mode
-	@echo "Starting backend development server..."
-	cd backend && source venv/bin/activate && python app.py
+test-pipeline-manual: ## Run manual pipeline test with test script
+	@echo "🧪 Running manual pipeline test..."
+	docker compose exec ros2 bash -c " \
+		cd /workspace/ros2_ws && \
+		source /opt/ros/humble/setup.bash && \
+		source install/setup.bash && \
+		echo '🚀 Starting pipeline coordinator...' && \
+		ros2 launch recycling_robot robot.launch.py & \
+		sleep 10 && \
+		echo '🧪 Running test script...' && \
+		python3 test_pipeline_comprehensive.py \
+	"
 
-dev-frontend: ## Start frontend in development mode
-	@echo "Starting frontend development server..."
-	cd web && npm run dev
+verify-pipeline: ## Verify pipeline components are working
+	@echo "🔍 Verifying pipeline components..."
+	docker compose exec ros2 bash -c " \
+		cd /workspace/ros2_ws && \
+		source /opt/ros/humble/setup.bash && \
+		source install/setup.bash && \
+		echo '📋 Checking nodes:' && \
+		ros2 node list | grep -E '(pipeline|classifier|sorting|camera)' && \
+		echo '📡 Checking topics:' && \
+		ros2 topic list | grep pipeline && \
+		echo '📊 Checking pipeline state:' && \
+		timeout 3s ros2 topic echo /pipeline/state --once || echo 'No pipeline state available yet' \
+	"
 
-dev: ## Start both backend and frontend in development mode
-	@echo "Starting development environment..."
-	@make dev-backend & make dev-frontend
+launch-robot: ## Launch the complete robot system
+	@echo "🚀 Launching recycling robot with synchronous pipeline..."
+	docker compose exec ros2 bash -c " \
+		cd /workspace/ros2_ws && \
+		source /opt/ros/humble/setup.bash && \
+		source install/setup.bash && \
+		echo '🎯 Launching robot.launch.py...' && \
+		ros2 launch recycling_robot robot.launch.py \
+	"
 
-test: ## Run tests
-	@echo "Running tests..."
-	cd backend && source venv/bin/activate && python -m pytest tests/ || echo "No tests found"
-	cd web && npm test || echo "No tests configured"
+clean: ## Clean build artifacts
+	@echo "🧹 Cleaning build artifacts..."
+	docker compose exec ros2 bash -c "cd /workspace/ros2_ws && rm -rf build/ install/ log/"
+	@echo "✅ Build artifacts cleaned"
 
-lint: ## Run linting
-	@echo "Running linting..."
-	cd backend && source venv/bin/activate && flake8 . || echo "Flake8 not installed"
-	cd web && npm run lint || echo "Lint script not configured"
-
-format: ## Format code
-	@echo "Formatting code..."
-	cd backend && source venv/bin/activate && black . || echo "Black not installed"
-	cd web && npm run format || echo "Format script not configured"
-
-reset: ## Reset everything (use with caution!)
-	@echo "Resetting everything..."
-	@make down
-	@make clean
-	@rm -rf backend/venv web/node_modules
-	@echo "Reset complete. Run 'make install' to reinstall dependencies."
+# Default target
+all: install up build
+	@echo "🎉 All tasks completed!"

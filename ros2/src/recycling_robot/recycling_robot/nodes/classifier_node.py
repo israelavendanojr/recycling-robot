@@ -43,6 +43,7 @@ class ClassifierNode(Node):
         self._running = True
         self._backend_ready = False
         self._shutdown_event = threading.Event()
+        self.pipeline_state = "idle"  # Track pipeline state
         
         # PyTorch model setup
         self.model = None
@@ -71,6 +72,21 @@ class ClassifierNode(Node):
             self.classification_publisher = self.create_publisher(
                 String,
                 'classifier/result',
+                10
+            )
+            
+            # Pipeline state subscription
+            self.pipeline_state_sub = self.create_subscription(
+                String, 
+                '/pipeline/state', 
+                self.pipeline_state_callback, 
+                10
+            )
+            
+            # Pipeline completion publisher
+            self.pipeline_completion_pub = self.create_publisher(
+                String,
+                '/pipeline/classification_done',
                 10
             )
             
@@ -305,6 +321,14 @@ class ClassifierNode(Node):
             self.get_logger().error(f'[Classifier] Inference failed: {e}')
             return None, 0.0
 
+    def pipeline_state_callback(self, msg):
+        """Handle pipeline state updates"""
+        try:
+            self.pipeline_state = msg.data
+            self.get_logger().debug(f'[Classifier] Pipeline state: {self.pipeline_state}')
+        except Exception as e:
+            self.get_logger().error(f'[Classifier] Pipeline state callback error: {e}')
+
     def image_callback(self, msg):
         """Handle incoming image messages with clean logging"""
         try:
@@ -316,6 +340,11 @@ class ClassifierNode(Node):
     def auto_classify(self):
         """Auto-classify latest image with clean logging"""
         if not self._running or self.latest_image is None:
+            return
+            
+        # Skip if pipeline is busy
+        if self.pipeline_state == "processing":
+            self.get_logger().info('⏸️ [Classifier] Pipeline busy, skipping classification (waiting for sorting to complete)')
             return
             
         try:
@@ -352,8 +381,14 @@ class ClassifierNode(Node):
             # Send to backend API
             self._send_to_backend(result)
             
+            # Notify pipeline coordinator of classification completion
+            completion_msg = String()
+            completion_msg.data = json.dumps(result)
+            self.pipeline_completion_pub.publish(completion_msg)
+            self.get_logger().info('📤 [Classifier] Notified pipeline coordinator of classification completion')
+            
             # Log successful classification
-            self.get_logger().info(f'[Classifier] Predicted: {predicted_class} ({confidence*100:.1f}% confidence)')
+            self.get_logger().info(f'🎯 [Classifier] Classification complete: {predicted_class} ({confidence*100:.1f}% confidence)')
             
         except Exception as e:
             self.get_logger().error(f'[Classifier] Auto-classify failed: {e}')

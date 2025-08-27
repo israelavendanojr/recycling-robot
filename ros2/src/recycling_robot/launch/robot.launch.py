@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch.conditions import IfCondition, UnlessCondition
@@ -38,6 +38,43 @@ def generate_launch_description():
         use_real_camera_arg,
         image_folder_arg,
         backend_url_arg,
+        
+        # Startup logging
+        ExecuteProcess(
+            cmd=['echo', '[LAUNCH] 🚀 Starting Recycling Robot with Synchronous Pipeline...'],
+            name='startup_log_1',
+            output='screen'
+        ),
+        
+        # --- Pipeline Coordinator node (start first) ---
+        ExecuteProcess(
+            cmd=['echo', '[LAUNCH] 🔄 Starting Pipeline Coordinator...'],
+            name='startup_log_2',
+            output='screen'
+        ),
+        
+        Node(
+            package='recycling_robot',
+            executable='pipeline_coordinator_node',
+            name='pipeline_coordinator_node',
+            output='screen',
+            parameters=[{
+                'timeout_seconds': 10.0,
+                'state_file_path': '/tmp/pipeline_state.json'
+            }]
+        ),
+        
+        # Wait for coordinator to start
+        TimerAction(
+            period=2.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=['echo', '[LAUNCH] 📷 Starting Camera and Processing Nodes...'],
+                    name='startup_log_3',
+                    output='screen'
+                )
+            ]
+        ),
         
         # --- Mock Camera node (default) ---
         Node(
@@ -90,5 +127,17 @@ def generate_launch_description():
             parameters=[{
                 'sorting_delay': 1.0
             }]
+        ),
+        
+        # Simple pipeline status check
+        TimerAction(
+            period=5.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=['echo', '[LAUNCH] ✅ Pipeline coordinator ready - check status with: ros2 topic echo /pipeline/state'],
+                    name='pipeline_ready',
+                    output='screen'
+                )
+            ]
         ),
     ])

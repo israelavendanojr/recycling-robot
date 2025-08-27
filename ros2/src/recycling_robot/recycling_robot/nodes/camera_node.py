@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
-from std_msgs.msg import Header
+from std_msgs.msg import Header, String
 import cv2
 import numpy as np
 import os
@@ -37,10 +37,19 @@ class CameraNode(Node):
         # Publisher for compressed images (same format as mock camera)
         self.publisher = self.create_publisher(CompressedImage, '/camera/image_raw', 10)
         
+        # Pipeline state subscription
+        self.pipeline_state_sub = self.create_subscription(
+            String, 
+            '/pipeline/state', 
+            self.pipeline_state_callback, 
+            10
+        )
+        
         # State
         self.cap = None
         self._running = True
         self._shutdown_event = threading.Event()
+        self.pipeline_state = "idle"  # Track pipeline state
         self._init_camera()
         
         # Publishing thread
@@ -51,6 +60,14 @@ class CameraNode(Node):
         self.get_logger().info(f'[Camera] Target device: /dev/video{self.device_id}')
         self.get_logger().info(f'[Camera] Target FPS: {self.fps}')
         self.get_logger().info(f'[Camera] Target resolution: {self.width}x{self.height}')
+
+    def pipeline_state_callback(self, msg):
+        """Handle pipeline state updates"""
+        try:
+            self.pipeline_state = msg.data
+            self.get_logger().debug(f'[Camera] Pipeline state: {self.pipeline_state}')
+        except Exception as e:
+            self.get_logger().error(f'[Camera] Pipeline state callback error: {e}')
 
     def _detect_cameras(self):
         """Detect available camera devices"""
@@ -162,6 +179,13 @@ class CameraNode(Node):
                         buffer = io.BytesIO()
                         pil_image.save(buffer, format='JPEG', quality=self.jpeg_quality)
                         compressed_data = buffer.getvalue()
+                        
+                        # Check pipeline state before publishing
+                        if self.pipeline_state == "processing":
+                            # Skip publishing if pipeline is busy
+                            if frame_count % 30 == 0:  # Log every 30 frames
+                                self.get_logger().info('⏸️ [Camera] Pipeline busy, skipping image publication (waiting for sorting to complete)')
+                            continue
                         
                         # Create ROS2 CompressedImage message
                         msg = CompressedImage()

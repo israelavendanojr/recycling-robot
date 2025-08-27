@@ -1,31 +1,16 @@
-# Recycling Robot
+# Recycling Robot with Synchronous Pipeline
 
-A robotics project focused on AI-powered waste classification and sorting.
+A ROS2-based recycling robot that automatically classifies and sorts recyclable materials using computer vision and motor control, with a **synchronous pipeline** that eliminates race conditions.
 
-## Architecture Overview
+## 🎯 Features
 
-```
-recycling-robot/
-├── backend/               # Single Flask API
-│   ├── app.py            # Main Flask application
-│   ├── Dockerfile        # Backend container
-│   └── requirements.txt  # Python dependencies
-├── web/                  # React + TypeScript frontend
-│   ├── src/              # Frontend source code
-│   ├── package.json      # Node.js dependencies
-│   └── Dockerfile        # Frontend container
-├── ros2/                 # Pure ROS2 workspace
-│   └── src/recycling_robot/
-│       ├── nodes/        # ROS2 nodes (no web APIs)
-│       ├── launch/       # ROS2 launch files
-│       └── config/       # ROS2 configuration
-├── scripts/              # Utility scripts
-├── docker-compose.yml    # Service orchestration
-├── Makefile             # Development commands
-└── README.md            # This file
-```
+- **Computer Vision Classification**: Uses PyTorch to classify materials (cardboard, glass, metal, plastic, trash)
+- **Motor Control**: Automated sorting with motor-driven actuators
+- **Synchronous Pipeline**: Eliminates race conditions with coordinated processing
+- **Web Interface**: Real-time monitoring dashboard with pipeline status
+- **Docker Integration**: Containerized development environment
 
-## Quick Start 
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 ```bash
@@ -37,91 +22,166 @@ make install
 make up
 ```
 
-### 3. ROS2 Launch
+### 3. Launch ROS2 Robot
 ```bash
-docker compose exec ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && source install/setup.bash && timeout 30s ros2 launch recycling_robot robot.launch.py"
+make launch-robot
 ```
 
+## 🧪 Testing the Synchronous Pipeline
 
-
-### 3. Access Dashboard
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **ROS2**: Running in container - 
-    docker compose exec ros2 bash
-    cd /workspace/ros2_ws
-    colcon build --symlink-install
-    source install/setup.bash
-    
-    source /opt/ros/humble/setup.bash
-    source /workspace/ros2_ws/install/setup.bash
-
-    ros2 launch recycling_robot robot.launch.py
-
-
-    docker compose exec ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && source install/setup.bash && timeout 30s ros2 launch recycling_robot robot.launch.py"
-
-## Development Commands
-
+### Quick Test
 ```bash
-make help          # Show all available commands
-make dev           # Start both backend and frontend in dev mode
-make dev-backend   # Start only backend in dev mode
-make dev-frontend  # Start only frontend in dev mode
-make test          # Run tests
-make lint          # Run code linting
-make format        # Format code
-make clean         # Clean Docker resources
-make reset         # Reset everything (use with caution!)
+./quick_pipeline_test.sh
 ```
 
-## API Endpoints
+### Comprehensive Testing
+```bash
+# Test pipeline functionality
+make test-pipeline
 
-The backend provides a single, unified API:
+# Monitor pipeline state in real-time
+make monitor-pipeline
 
-- `GET /api/health` - System health status
-- `GET /api/classifications` - Classification history
-- `GET /api/classifications/latest` - Most recent classification
-- `GET /api/current_image` - ROS2 camera stream
-- `GET /api/counters` - Material counts
-- `POST /api/classifier/start|stop` - Control classifier
+# Run manual test with simulation
+make test-pipeline-manual
 
-## Pipeline
-
-```
-ROS2 Camera Node → ROS2 Classifier → SQLite Database → Flask API → React Frontend
+# Verify pipeline components
+make verify-pipeline
 ```
 
+## 📊 Pipeline Monitoring
 
-## Technology Stack
+The synchronous pipeline ensures:
+- **No Race Conditions**: Only one item processes at a time
+- **Physical Consistency**: Motor completes before next classification
+- **Real-time Status**: Web interface shows current pipeline state
+- **Automatic Recovery**: Timeout protection and error handling
 
-- **Backend**: Flask + SQLite + psutil
-- **Frontend**: React + TypeScript + Tailwind CSS
-- **Robotics**: ROS2 Humble, Pytorch Model
-- **Containerization**: Docker + Docker Compose
+### Expected Output During Launch
+```
+[LAUNCH] 🚀 Starting Recycling Robot with Synchronous Pipeline...
+[LAUNCH] 🔄 Starting Pipeline Coordinator...
+🟢 PIPELINE: READY FOR NEXT ITEM
+[LAUNCH] 📷 Starting Camera and Processing Nodes...
+[VERIFY] 🔍 Checking Pipeline Topics...
+[VERIFY] 📊 Current Pipeline State:
+🟢 PIPELINE: READY FOR NEXT ITEM
+```
 
-## Troubleshooting
+## 🏗️ Architecture
+
+```
+Camera → Classifier → Sorting → Complete → Next Item
+   ↓         ↓         ↓         ↓
+  Wait    Process   Move Motor  Notify
+  (if     (if       (if        Coordinator
+   busy)   idle)     busy)
+```
+
+## 📁 Project Structure
+
+```
+recycling-robot/
+├── ros2/src/recycling_robot/          # ROS2 package
+│   ├── nodes/                         # ROS2 nodes
+│   │   ├── pipeline_coordinator_node.py  # Pipeline coordinator
+│   │   ├── camera_node.py            # Real camera
+│   │   ├── mock_camera_node.py       # Mock camera
+│   │   ├── classifier_node.py        # ML classifier
+│   │   └── sorting_node.py           # Motor control
+│   ├── launch/                       # Launch files
+│   └── setup.py                      # Package configuration
+├── backend/                          # Flask API
+├── web/                             # React frontend
+├── Makefile                         # Build and test commands
+├── quick_pipeline_test.sh           # Quick pipeline test
+└── test_pipeline_comprehensive.py   # Comprehensive test script
+```
+
+## 🔧 Development
+
+### Building the Package
+```bash
+make build
+```
+
+### Monitoring Pipeline State
+```bash
+# In ROS2 container
+ros2 topic echo /pipeline/state
+
+# Via web interface
+# Open browser and check Pipeline Status component
+```
+
+### Testing Individual Components
+```bash
+# Test pipeline coordinator
+ros2 run recycling_robot pipeline_coordinator_node
+
+# Test with mock camera
+ros2 launch recycling_robot robot.launch.py
+
+# Test with real camera
+ros2 launch recycling_robot robot.launch.py use_real_camera:=true
+```
+
+## 📈 Pipeline States
+
+- **🟢 IDLE**: Ready for new item, cameras can publish, classifier can process
+- **🔴 PROCESSING**: Item being sorted, cameras wait, classifier waits
+- **⏸️ WAITING**: Intermediate state during transitions
+
+## 🎯 Success Criteria
+
+When the pipeline is working correctly, you should see:
+- ✅ Pipeline coordinator starts first
+- ✅ State transitions: idle → processing → idle
+- ✅ Camera nodes respect pipeline state
+- ✅ Classifier waits when pipeline busy
+- ✅ Motor operations complete before next item
+- ✅ No race conditions during rapid item presentation
+- ✅ Web interface shows real-time pipeline status
+
+## 🐛 Troubleshooting
 
 ### Common Issues
-1. **Port conflicts**: Ensure ports 8000, 5173, and 8080 are available
-2. **Permission errors**: Use `sudo` for file operations if needed
-3. **Dependencies**: Run `make install` to set up virtual environments
+1. **Pipeline stuck in "processing" state**
+   - Check sorting node logs for motor errors
+   - Pipeline auto-resets after 10s timeout
 
-### Reset Everything
+2. **No images being published**
+   - Check pipeline state: `ros2 topic echo /pipeline/state`
+   - If "processing", wait for sorting to complete
+
+3. **Classifier not processing**
+   - Verify pipeline state
+   - Check classifier logs for errors
+
+### Debug Commands
 ```bash
-make reset        # Clean slate
-make install      # Reinstall dependencies
-make up          # Start services
+# Check pipeline topics
+ros2 topic list | grep pipeline
+
+# Monitor message flow
+ros2 topic echo /pipeline/state &
+ros2 topic echo /pipeline/classification_done &
+ros2 topic echo /pipeline/sorting_done &
+
+# Check node status
+ros2 node list
+ros2 node info /pipeline_coordinator_node
 ```
 
-## Contributing
+## 📚 Documentation
 
-1. **Keep it lean**: Don't add complexity without clear need
-2. **Single responsibility**: Each component has one job
-3. **No duplication**: Don't create duplicate APIs or functionality
-4. **Document changes**: Update README and add comments
+- [PIPELINE_README.md](PIPELINE_README.md) - Detailed pipeline implementation guide
+- [Makefile](Makefile) - Available commands and testing options
 
----
+## 🤝 Contributing
 
-*Built for sustainable robotics development*
+This is a beginner-friendly robotics project. All code follows ROS2 best practices and includes clear comments for maintainability.
 
+## 📄 License
+
+Apache License 2.0

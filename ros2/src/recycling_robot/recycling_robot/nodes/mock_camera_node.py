@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import String
 import os, io, time
 from PIL import Image
 
@@ -34,9 +35,18 @@ class MockCameraNode(Node):
         # Publisher (use the SAME topic as the real camera)
         self.publisher = self.create_publisher(CompressedImage, '/camera/image_raw', 10)
 
+        # Pipeline state subscription
+        self.pipeline_state_sub = self.create_subscription(
+            String, 
+            '/pipeline/state', 
+            self.pipeline_state_callback, 
+            10
+        )
+
         # Load images
         self.current_image_index = 0
         self.test_images = []
+        self.pipeline_state = "idle"  # Track pipeline state
         self._load_test_images()
 
         # Timer
@@ -48,6 +58,14 @@ class MockCameraNode(Node):
         self.get_logger().info(f'[MockCamera] Found {len(self.test_images)} test images')
         if self.snapshot_enabled:
             self.get_logger().info(f'[MockCamera] Snapshot path: {self.snapshot_path}')
+
+    def pipeline_state_callback(self, msg):
+        """Handle pipeline state updates"""
+        try:
+            self.pipeline_state = msg.data
+            self.get_logger().debug(f'[MockCamera] Pipeline state: {self.pipeline_state}')
+        except Exception as e:
+            self.get_logger().error(f'[MockCamera] Pipeline state callback error: {e}')
 
     def _load_test_images(self):
         try:
@@ -127,6 +145,11 @@ class MockCameraNode(Node):
         try:
             if not self.test_images:
                 self.get_logger().warn('[MockCamera] No test images available')
+                return
+                
+            # Skip publishing if pipeline is busy
+            if self.pipeline_state == "processing":
+                self.get_logger().info('⏸️ [MockCamera] Pipeline busy, skipping image publication (waiting for sorting to complete)')
                 return
 
             path = self.test_images[self.current_image_index]

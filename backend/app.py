@@ -179,6 +179,38 @@ def get_stream():
         'message': 'Direct camera access via ROS2'
     })
 
+@app.route('/api/pipeline/state')
+def get_pipeline_state():
+    """Get current pipeline state"""
+    try:
+        import json
+        import os
+        
+        # Try to read from pipeline state file
+        state_file = '/tmp/pipeline_state.json'
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, 'r') as f:
+                    state_data = json.load(f)
+                return jsonify(state_data)
+            except Exception as e:
+                print(f"Error reading pipeline state file: {e}")
+        
+        # Fallback to default state
+        return jsonify({
+            'state': 'idle',
+            'timestamp': time.time(),
+            'last_change': time.time(),
+            'current_item': None
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'state': 'unknown',
+            'error': str(e),
+            'timestamp': time.time()
+        }), 500
+
 @app.route('/api/events', methods=['GET', 'POST'])
 def handle_events():
     if request.method == 'POST':
