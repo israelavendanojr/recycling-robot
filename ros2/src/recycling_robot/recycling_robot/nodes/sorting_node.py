@@ -20,10 +20,10 @@ class SortingNode(Node):
         # Get parameters
         self.sorting_delay = self.get_parameter('sorting_delay').value
         
-        # Subscribe to classifier results
+        # Subscribe to pipeline classification completion
         self.classification_subscription = self.create_subscription(
             String,
-            'classifier/result',
+            '/pipeline/classification_done',
             self.classification_callback,
             10
         )
@@ -41,15 +41,17 @@ class SortingNode(Node):
         
         self.get_logger().info('[SortingNode] Sorting node started')
         self.get_logger().info(f'[SortingNode] Processing delay: {self.sorting_delay}s')
+        self.get_logger().info('[SortingNode] Subscribed to /pipeline/classification_done')
+        self.get_logger().info('[SortingNode] Will publish to /pipeline/sorting_done')
 
     def classification_callback(self, msg):
-        """Handle incoming classification results"""
+        """Handle incoming classification completion messages"""
         try:
             # Parse classification result
             classification = json.loads(msg.data)
             self.latest_classification = classification
             
-            self.get_logger().info(f'[SortingNode] Classification: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
+            self.get_logger().info(f'[SortingNode] Received classification: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
             
             # Trigger sorting action
             self._perform_sorting(classification)
@@ -88,7 +90,12 @@ class SortingNode(Node):
                 
                 # Notify pipeline coordinator of completion
                 completion_msg = String()
-                completion_msg.data = "complete"
+                completion_msg.data = json.dumps({
+                    'status': 'complete',
+                    'material': material_class,
+                    'action': sorting_action,
+                    'timestamp': time.time()
+                })
                 self.pipeline_completion_pub.publish(completion_msg)
                 self.get_logger().info('📤 [SortingNode] Notified pipeline coordinator of completion')
                 
@@ -123,12 +130,12 @@ class SortingNode(Node):
         return action_descriptions.get(action, 'Unknown action')
 
     def _control_actuator(self, action):
-        """Simple motor control - just spin for 1 second on any classification"""
+        """Control motor for 1 second on any classification"""
         self.get_logger().info(f'⚡ [Motor] Starting motor for classification: {action}')
         try:
-            self.get_logger().info('🔄 [Motor] Motor forward (speed=0.80)')
+            self.get_logger().info('🔄 [Motor] Motor forward (speed=0.80) for 1 second')
             self.motor.forward(0.8)
-            time.sleep(1)
+            time.sleep(1.0)  # Spin for exactly 1 second
             self.motor.stop()
             self.get_logger().info('⏹️ [Motor] Motor stop - cycle completed')
         except Exception as e:

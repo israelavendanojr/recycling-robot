@@ -10,9 +10,15 @@ services:
       - "8000:8000"
     environment:
       - FLASK_ENV=${FLASK_ENV:-production}
-      - API_BASE_URL=${API_BASE_URL}
+      - API_BASE_URL=http://backend:8000   # Internal URL for services
     networks:
       - robot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   ros2:
     build: ./ros2
@@ -20,11 +26,12 @@ services:
       - ./ros2/src:/workspace/ros2_ws/src
       - shared_data:/data
       - shared_frames:/shared  # Shared volume for camera frames
-      - /dev:/dev                       # Full device access for GPIO
-      - /sys/class/gpio:/sys/class/gpio # GPIO sysfs interface
-      - /sys/devices:/sys/devices       # Device tree access
+      - /dev:/dev
+      - /sys/class/gpio:/sys/class/gpio
+      - /sys/devices:/sys/devices
     privileged: true
-    network_mode: host  # Use host network for direct hardware access
+    networks:
+      - robot_network
     group_add:
       - video
       - gpio
@@ -36,10 +43,11 @@ services:
       - "/dev/gpiochip4:/dev/gpiochip4"  # Pi 5 compatibility
       - "/dev/gpiomem:/dev/gpiomem"
     environment:
-      - API_BASE_URL=http://localhost:8000
-      - GPIOMEM=1                       # Enable gpiomem for RPi.GPIO
+      - BACKEND_URL=http://backend:8000  # MUST point to service name
+      - GPIOMEM=1
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     command: ["tail", "-f", "/dev/null"]
 
   web:
@@ -49,12 +57,14 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
-      - VITE_VIDEO_URL=${VITE_VIDEO_URL:-http://localhost:8080/video_feed}
+      # Point frontend to backend by service name, not localhost
+      - VITE_API_BASE=http://backend:8000
+      - VITE_VIDEO_URL=http://backend:8000/video_feed
     networks:
       - robot_network
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 # Define custom network and shared volumes
 networks:

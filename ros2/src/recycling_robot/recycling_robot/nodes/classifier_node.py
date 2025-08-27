@@ -26,13 +26,13 @@ class ClassifierNode(Node):
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.INFO)
         
         # Parameters
-        self.declare_parameter('api_base_url', 'http://backend:8000')
+        self.declare_parameter('api_base_url', os.getenv('BACKEND_URL', 'http://backend:8000'))
         self.declare_parameter('inference_interval', 3.0)
         self.declare_parameter('confidence_threshold', 0.7)
         self.declare_parameter('model_path', 'src/recycling_robot/recycling_robot/models/recycler.pt')
         
         # Get API URL from environment or parameter
-        self.api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8000')
+        self.api_base_url = os.getenv('BACKEND_URL', 'http://backend:8000')
         self.interval = self.get_parameter('inference_interval').value
         self.threshold = self.get_parameter('confidence_threshold').value
         self.model_path = self.get_parameter('model_path').value
@@ -65,7 +65,7 @@ class ClassifierNode(Node):
         # Only create subscriptions and timer after backend is ready
         if self._running:  # Check if we haven't been shutdown during backend wait
             self.subscription = self.create_subscription(
-                CompressedImage, 'camera/image_raw', self.image_callback, 10
+                CompressedImage, '/pipeline/image_raw', self.image_callback, 10
             )
             
             # Publisher for classification results
@@ -158,7 +158,7 @@ class ClassifierNode(Node):
     def _init_database(self):
         """Initialize SQLite database with clean logging"""
         try:
-            db_path = os.path.expanduser('~/classifications.db')
+            db_path = '/home/robot/classifications.db'
             os.makedirs(os.path.dirname(db_path), exist_ok=True)
             
             conn = sqlite3.connect(db_path)
@@ -205,7 +205,7 @@ class ClassifierNode(Node):
                 result['class'],
                 result['confidence'],
                 json.dumps(result.get('raw_logits', [])),
-                'camera'  # Generic source since both mock and real publish to same topic
+                'pipeline'  # Source from pipeline topic
             ))
             
             conn.commit()
@@ -229,7 +229,7 @@ class ClassifierNode(Node):
             
             # Send POST request to backend
             response = requests.post(
-                f'{self.api_base_url}/api/events',
+                f'{self.api_base_url}/api/classifications',
                 json=backend_data,
                 timeout=5.0
             )
@@ -246,7 +246,7 @@ class ClassifierNode(Node):
         """Preprocess compressed image for model inference using PIL + Torch only"""
         try:
             # Extract image data from CompressedImage message
-            if compressed_image_msg.format != 'jpeg':
+            if compressed_image_msg.format not in ['jpeg', 'png']:
                 self.get_logger().warn(f'[Classifier] Unsupported image format: {compressed_image_msg.format}')
                 return None
             

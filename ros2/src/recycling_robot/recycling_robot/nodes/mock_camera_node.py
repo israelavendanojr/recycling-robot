@@ -32,8 +32,8 @@ class MockCameraNode(Node):
         self.snapshot_enabled = bool(self.get_parameter('snapshot_enabled').value)
         self.snapshot_path = self.get_parameter('snapshot_path').value
 
-        # Publisher (use the SAME topic as the real camera)
-        self.publisher = self.create_publisher(CompressedImage, '/camera/image_raw', 10)
+        # Publisher (use the pipeline topic for downstream nodes)
+        self.publisher = self.create_publisher(CompressedImage, '/pipeline/image_raw', 10)
 
         # Pipeline state subscription
         self.pipeline_state_sub = self.create_subscription(
@@ -125,21 +125,35 @@ class MockCameraNode(Node):
             img.save(os.path.join(directory, f'sample_{name}.jpg'), 'JPEG', quality=85)
         self.get_logger().info(f'[MockCamera] Created {len(materials)} sample images in {directory}')
 
-    def _write_snapshot_atomic(self, jpeg_bytes: bytes):
+    def _write_snapshot_atomic(self, image_bytes: bytes, format_type: str):
+        """Write snapshot with fallback support - always update SNAPSHOT_PATH"""
         try:
             if not self.snapshot_enabled or not self.snapshot_path:
                 return
-            snap_dir = os.path.dirname(self.snapshot_path) or '.'
+            
+            # Determine the actual snapshot path based on format
+            if format_type == 'JPEG':
+                actual_path = '/shared/current_frame.jpg'
+            else:  # PNG fallback
+                actual_path = '/shared/current_frame.png'
+            
+            # Update the snapshot path so backend always knows the latest file
+            self.snapshot_path = actual_path
+            
+            snap_dir = os.path.dirname(actual_path) or '.'
             os.makedirs(snap_dir, exist_ok=True)
-            tmp_path = f'{self.snapshot_path}.tmp'
+            tmp_path = f'{actual_path}.tmp'
+            
             with open(tmp_path, 'wb') as f:
-                f.write(jpeg_bytes)
+                f.write(image_bytes)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp_path, self.snapshot_path)  # atomic on POSIX
-            self.get_logger().debug(f'[MockCamera] Snapshot saved: {self.snapshot_path} ({len(jpeg_bytes)} bytes)')
+            os.replace(tmp_path, actual_path)  # atomic on POSIX
+            
+            self.get_logger().info(f'[MockCamera] Snapshot saved: {actual_path} ({len(image_bytes)} bytes, {format_type})')
+            
         except Exception as e:
-            self.get_logger().warn(f'[MockCamera] Failed to write snapshot: {e}')
+            self.get_logger().error(f'[MockCamera] Failed to write snapshot: {e}')
 
     def publish_test_image(self):
         try:
@@ -161,22 +175,46 @@ class MockCameraNode(Node):
                 # optional downscale guard
                 if img.width > 1920 or img.height > 1080:
                     img.thumbnail((1920, 1080), Image.Resampling.LANCZOS)
-                buf = io.BytesIO()
-                img.save(buf, format='JPEG', quality=self.image_quality)
-                jpeg_bytes = buf.getvalue()
+                
+                # Try JPEG first, fallback to PNG if it fails
+                jpeg_bytes = None
+                png_bytes = None
+                format_type = 'JPEG'
+                
+                try:
+                    # Try JPEG
+                    buf = io.BytesIO()
+                    img.save(buf, format='JPEG', quality=self.image_quality)
+                    jpeg_bytes = buf.getvalue()
+                    format_type = 'JPEG'
+                    image_bytes = jpeg_bytes
+                    self.get_logger().debug(f'[MockCamera] JPEG encoding successful ({len(jpeg_bytes)} bytes)')
+                except Exception as jpeg_error:
+                    self.get_logger().warn(f'[MockCamera] JPEG encoding failed, falling back to PNG: {jpeg_error}')
+                    try:
+                        # Fallback to PNG
+                        buf = io.BytesIO()
+                        img.save(buf, format='PNG')
+                        png_bytes = buf.getvalue()
+                        format_type = 'PNG'
+                        image_bytes = png_bytes
+                        self.get_logger().info(f'[MockCamera] PNG fallback successful ({len(png_bytes)} bytes)')
+                    except Exception as png_error:
+                        self.get_logger().error(f'[MockCamera] Both JPEG and PNG encoding failed: {png_error}')
+                        return
 
-            # Publish on ROS2
+            # Publish on ROS2 pipeline topic
             msg = CompressedImage()
-            msg.format = 'jpeg'
-            msg.data = jpeg_bytes
+            msg.format = 'jpeg' if format_type == 'JPEG' else 'png'
+            msg.data = image_bytes
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = 'mock_camera_frame'
             self.publisher.publish(msg)
 
-            # Write snapshot for backend
-            self._write_snapshot_atomic(jpeg_bytes)
+            # Write snapshot for backend (with fallback support)
+            self._write_snapshot_atomic(image_bytes, format_type)
 
-            self.get_logger().info(f'[MockCamera] Published: {name} ({len(jpeg_bytes)} bytes)')
+            self.get_logger().info(f'[MockCamera] Published to /pipeline/image_raw: {name} ({len(image_bytes)} bytes, {format_type})')
             self.current_image_index = (self.current_image_index + 1) % len(self.test_images)
 
         except Exception as e:

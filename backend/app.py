@@ -146,6 +146,19 @@ def check_health():
         
         time.sleep(30)  # Check every 30 seconds
 
+def get_current_frame_path():
+    """Get the current frame path, with fallback from JPG to PNG"""
+    # Try JPG first
+    jpg_path = '/shared/current_frame.jpg'
+    png_path = '/shared/current_frame.png'
+    
+    if os.path.exists(jpg_path):
+        return jpg_path, 'image/jpeg'
+    elif os.path.exists(png_path):
+        return png_path, 'image/png'
+    else:
+        return None, None
+
 # API Routes
 @app.route('/api/health')
 def get_health():
@@ -164,7 +177,7 @@ def get_health():
         system_info = {}
     
     return jsonify({
-        'ok': overall,
+        'status': 'ok' if overall else 'error',
         'services': health_status,
         'system': system_info,
         'timestamp': time.time(),
@@ -244,76 +257,94 @@ def handle_events():
         except Exception as e:
             return jsonify([]), 500
 
-@app.route('/api/classifications')
-def get_classifications():
-    """Get classification history from SQLite database - matches ROS2 web_node format"""
-    try:
-        # Try to connect to the classifier's database first
-        db_path = os.path.expanduser('~/classifications.db')
-        if not os.path.exists(db_path):
-            # Fallback to our local database
-            db_path = DATABASE_PATH
-        
-        with sqlite3.connect(db_path) as conn:
-            # Check if this is the classifier database or our events database
-            try:
-                cursor = conn.execute('''
-                    SELECT id, timestamp, label, confidence, raw_logits, image_source, created_at
-                    FROM classifications 
-                    ORDER BY created_at DESC 
-                    LIMIT 100
-                ''')
-                rows = cursor.fetchall()
-                classifications = []
-                
-                for row in rows:
-                    classifications.append({
-                        'id': row[0],
-                        'timestamp': row[1],
-                        'label': row[2],
-                        'confidence': row[3],
-                        'raw_logits': row[4],
-                        'image_source': row[5],
-                        'created_at': row[6]
-                    })
-                
-                return jsonify({
-                    'success': True,
-                    'count': len(classifications),
-                    'classifications': classifications
-                })
-                
-            except sqlite3.OperationalError:
-                # This is our events database, use different schema
-                cursor = conn.execute('''
-                    SELECT id, class, confidence, timestamp
-                    FROM events 
-                    ORDER BY timestamp DESC 
-                    LIMIT 100
-                ''')
-                rows = cursor.fetchall()
-                classifications = []
-                
-                for row in rows:
-                    classifications.append({
-                        'id': row[0],
-                        'timestamp': row[3],  # timestamp is the last column
-                        'label': row[1],      # class is the second column
-                        'confidence': row[2],  # confidence is the third column
-                        'raw_logits': None,
-                        'image_source': 'camera',
-                        'created_at': row[3]
-                    })
-                
-                return jsonify({
-                    'success': True,
-                    'count': len(classifications),
-                    'classifications': classifications
-                })
+@app.route('/api/classifications', methods=['GET', 'POST'])
+def handle_classifications():
+    """Handle both GET and POST requests for classifications"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute(
+                    'INSERT INTO events (class, confidence, timestamp) VALUES (?, ?, ?)',
+                    (data['class'], data['confidence'], data['timestamp'])
+                )
+                conn.commit()
             
-    except Exception as e:
-        print(f"Error in get_classifications: {e}")
-        return jsonify({'error': str(e), 'classifications': []})
+            # Update counters cache
+            counters_cache[data['class']] += 1
+            
+            return jsonify({'success': True, 'message': 'Classification logged'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    else:  # GET
+        try:
+            # Try to connect to the classifier's database first
+            db_path = '/home/robot/classifications.db'
+            if not os.path.exists(db_path):
+                # Fallback to our local database
+                db_path = DATABASE_PATH
+            
+            with sqlite3.connect(db_path) as conn:
+                # Check if this is the classifier database or our events database
+                try:
+                    cursor = conn.execute('''
+                        SELECT id, timestamp, label, confidence, raw_logits, image_source, created_at
+                        FROM classifications 
+                        ORDER BY created_at DESC 
+                        LIMIT 100
+                    ''')
+                    rows = cursor.fetchall()
+                    classifications = []
+                    
+                    for row in rows:
+                        classifications.append({
+                            'id': row[0],
+                            'timestamp': row[1],
+                            'label': row[2],
+                            'confidence': row[3],
+                            'raw_logits': row[4],
+                            'image_source': row[5],
+                            'created_at': row[6]
+                        })
+                    
+                    return jsonify({
+                        'success': True,
+                        'count': len(classifications),
+                        'classifications': classifications
+                    })
+                    
+                except sqlite3.OperationalError:
+                    # This is our events database, use different schema
+                    cursor = conn.execute('''
+                        SELECT id, class, confidence, timestamp
+                        FROM events 
+                        ORDER BY timestamp DESC 
+                        LIMIT 100
+                    ''')
+                    rows = cursor.fetchall()
+                    classifications = []
+                    
+                    for row in rows:
+                        classifications.append({
+                            'id': row[0],
+                            'timestamp': row[3],  # timestamp is the last column
+                            'label': row[1],      # class is the second column
+                            'confidence': row[2],  # confidence is the third column
+                            'raw_logits': None,
+                            'image_source': 'camera',
+                            'created_at': row[3]
+                        })
+                    
+                    return jsonify({
+                        'success': True,
+                        'count': len(classifications),
+                        'classifications': classifications
+                    })
+                
+        except Exception as e:
+            print(f"Error in get_classifications: {e}")
+            return jsonify({'error': str(e), 'classifications': []})
 
 @app.route('/api/classifications/latest')
 def get_latest_classification():
@@ -406,15 +437,20 @@ def get_current_image():
 @app.route('/api/current_frame.jpg')
 def serve_current_frame():
     """
-    Serve the latest JPEG bytes saved by the mock/real camera.
+    Serve the latest frame (JPG or PNG) saved by the mock/real camera.
+    Handles fallback from JPG to PNG automatically.
     """
     try:
-        if not os.path.exists(FRAME_PATH):
+        frame_path, mime_type = get_current_frame_path()
+        
+        if not frame_path:
             raise NotFound("No current frame available")
+        
         # no-store avoids browser caching
-        resp = send_file(FRAME_PATH, mimetype='image/jpeg', as_attachment=False, max_age=0, conditional=False)
+        resp = send_file(frame_path, mimetype=mime_type, as_attachment=False, max_age=0, conditional=False)
         resp.headers['Cache-Control'] = 'no-store, max-age=0'
         return resp
+        
     except NotFound as e:
         return jsonify({'success': False, 'error': 'no_frame'}), 404
     except Exception as e:
