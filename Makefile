@@ -25,12 +25,12 @@ down: ## Stop services
 
 build: ## Build ROS2 package
 	@echo "Building ROS2 package..."
-	docker compose exec ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select recycling_robot"
+	docker compose exec -T ros2 bash -c "cd /workspace/ros2_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select recycling_robot"
 	@echo "✅ ROS2 package built"
 
 test-pipeline: ## Test synchronous pipeline
 	@echo "🧪 Testing synchronous pipeline..."
-	docker compose exec ros2 bash -c " \
+	docker compose exec -T ros2 bash -c " \
 		cd /workspace/ros2_ws && \
 		source /opt/ros/humble/setup.bash && \
 		source install/setup.bash && \
@@ -46,7 +46,7 @@ test-pipeline: ## Test synchronous pipeline
 
 monitor-pipeline: ## Monitor pipeline state in real-time
 	@echo "📊 Monitoring pipeline state..."
-	docker compose exec ros2 bash -c " \
+	docker compose exec -T ros2 bash -c " \
 		cd /workspace/ros2_ws && \
 		source /opt/ros/humble/setup.bash && \
 		source install/setup.bash && \
@@ -58,7 +58,7 @@ monitor-pipeline: ## Monitor pipeline state in real-time
 
 test-pipeline-manual: ## Run manual pipeline test with test script
 	@echo "🧪 Running manual pipeline test..."
-	docker compose exec ros2 bash -c " \
+	docker compose exec -T ros2 bash -c " \
 		cd /workspace/ros2_ws && \
 		source /opt/ros/humble/setup.bash && \
 		source install/setup.bash && \
@@ -71,7 +71,7 @@ test-pipeline-manual: ## Run manual pipeline test with test script
 
 verify-pipeline: ## Verify pipeline components are working
 	@echo "🔍 Verifying pipeline components..."
-	docker compose exec ros2 bash -c " \
+	docker compose exec -T ros2 bash -c " \
 		cd /workspace/ros2_ws && \
 		source /opt/ros/humble/setup.bash && \
 		source install/setup.bash && \
@@ -83,19 +83,47 @@ verify-pipeline: ## Verify pipeline components are working
 		timeout 3s ros2 topic echo /pipeline/state --once || echo 'No pipeline state available yet' \
 	"
 
+launch-frontend: ## Start or ensure frontend is running
+	@echo "Starting frontend development server..."
+	@if ! docker compose ps web | grep -q "Up"; then \
+		echo "Frontend service not running, starting it..."; \
+		docker compose up -d web; \
+		sleep 5; \
+	else \
+		echo "Frontend service already running"; \
+	fi
+	@echo "Frontend status:"
+	@docker compose ps web
+	@echo "Frontend logs:"
+	@docker compose logs --tail=5 web
+
 launch-robot: ## Launch the complete robot system
-	@echo "🚀 Launching recycling robot with synchronous pipeline..."
-	docker compose exec ros2 bash -c " \
+	@echo "Launching recycling robot with synchronous pipeline..."
+	@echo "Ensuring frontend is running..."
+	@$(MAKE) launch-frontend
+	@echo "Starting ROS2 pipeline..."
+	docker compose exec -T ros2 bash -c " \
 		cd /workspace/ros2_ws && \
 		source /opt/ros/humble/setup.bash && \
 		source install/setup.bash && \
-		echo '🎯 Launching robot.launch.py...' && \
+		echo 'Launching robot.launch.py...' && \
 		ros2 launch recycling_robot robot.launch.py \
-	"
+	" &
+	@echo "Robot system starting..."
+	@echo "Dashboard: http://localhost:5173/ | API: http://localhost:8000"
+
+preview-frontend: ## Start frontend preview server (built version)
+	@echo "Starting frontend preview server..."
+	@cd web && npm run build
+	@cd web && npm run preview -- --host --port 5173
+
+check-frontend: ## Check frontend health and accessibility
+	@echo "Checking frontend health..."
+	@./scripts/check_frontend.sh
 
 clean: ## Clean build artifacts
 	@echo "🧹 Cleaning build artifacts..."
-	docker compose exec ros2 bash -c "cd /workspace/ros2_ws && rm -rf build/ install/ log/"
+	docker compose exec -T ros2 bash -c "cd /workspace/ros2_ws && rm -rf build/ install/ log/"
 	@echo "✅ Build artifacts cleaned"
 
 # Default target
