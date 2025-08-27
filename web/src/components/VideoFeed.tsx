@@ -5,23 +5,30 @@ export function VideoFeed() {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [imageInfo, setImageInfo] = useState<{ image_url: string; timestamp: number; source: string } | null>(null);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
+
+  const addDebugLog = (message: string) => {
+    setDebugLog(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
 
   useEffect(() => {
     const fetchImage = async () => {
       try {
-        console.log('[VideoFeed] Fetching current image...');
+        addDebugLog('Fetching current image...');
         const info = await fetchCurrentImage();
         if (info) {
           setImageInfo(info);
           setError(false);
           setLoading(false);
-          console.log('[VideoFeed] Successfully loaded image:', info);
+          addDebugLog(`Successfully loaded image: ${info.image_url}`);
         } else {
           setError(true);
           setLoading(false);
-          console.warn('[VideoFeed] No image info received');
+          addDebugLog('No image info received');
         }
       } catch (e) {
+        addDebugLog(`Failed to fetch image: ${e}`);
         console.error('[VideoFeed] Failed to fetch image:', e);
         setError(true);
         setLoading(false);
@@ -72,8 +79,12 @@ export function VideoFeed() {
                   alt="Live camera feed"
                   className="w-full h-full object-cover transition-opacity duration-500 opacity-100"
                   onError={() => {
+                    addDebugLog(`Image failed to load: ${imageInfo.image_url}`);
                     console.error('[VideoFeed] Image failed to load:', imageInfo.image_url);
                     setError(true);
+                  }}
+                  onLoad={() => {
+                    addDebugLog(`Image loaded successfully: ${imageInfo.image_url}`);
                   }}
                 />
               )}
@@ -85,6 +96,45 @@ export function VideoFeed() {
                 </div>
               )}
             </>
+          )}
+        </div>
+        
+        {/* Debug Information - Collapsible */}
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <div 
+            className="flex items-center justify-between cursor-pointer text-sm text-gray-600 hover:text-gray-800"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <span className="font-medium">🔧 Debug Info</span>
+            <svg 
+              className={`w-4 h-4 transition-transform duration-200 ${showDebug ? 'rotate-180' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+          
+          {showDebug && (
+            <div className="mt-3 space-y-3">
+              {/* Debug Log */}
+              <div className="p-3 bg-gray-50 rounded text-xs font-mono max-h-32 overflow-y-auto">
+                <div className="font-semibold mb-2 text-gray-700">Debug Log:</div>
+                {debugLog.map((log, index) => (
+                  <div key={index} className="text-gray-600">{log}</div>
+                ))}
+              </div>
+              
+              {/* Image Info Display */}
+              {imageInfo && (
+                <div className="p-3 bg-blue-50 rounded text-sm">
+                  <div><strong>Image URL:</strong> {imageInfo.image_url}</div>
+                  <div><strong>Timestamp:</strong> {new Date(imageInfo.timestamp * 1000).toLocaleString()}</div>
+                  <div><strong>Source:</strong> {imageInfo.source}</div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

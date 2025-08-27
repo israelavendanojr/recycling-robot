@@ -57,9 +57,9 @@ services:
     ports:
       - "5173:5173"
     environment:
-      # Point frontend to backend by service name, not localhost
-      - VITE_API_BASE=http://backend:8000
-      - VITE_VIDEO_URL=http://backend:8000/video_feed
+      # Point frontend to backend via localhost for browser access
+      - VITE_API_BASE=http://localhost:8000
+      - VITE_VIDEO_URL=http://localhost:8000/video_feed
     networks:
       - robot_network
     depends_on:

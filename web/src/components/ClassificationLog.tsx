@@ -61,7 +61,13 @@ function ClassificationTableRow({ event, isEven }: ClassificationTableRowProps) 
 export function ClassificationLog() {
   const [events, setEvents] = useState<ClassificationEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const addDebugLog = (message: string) => {
+    setDebugLog(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
 
   useEffect(() => {
     const tick = async () => {
@@ -70,11 +76,14 @@ export function ClassificationLog() {
       abortRef.current = controller;
       
       try {
+        addDebugLog('Fetching events...');
         const data = await fetchEvents(controller.signal);
         setEvents(data);
         setError(null);
+        addDebugLog(`Successfully fetched ${data.length} events`);
       } catch (e: any) {
         if (e?.name === 'AbortError') return;
+        addDebugLog(`Failed to fetch events: ${e?.message || 'Unknown error'}`);
         console.error('[ClassificationLog] fetchEvents failed', e);
         setError(e?.message || 'Failed to load events');
       }
@@ -150,6 +159,52 @@ export function ClassificationLog() {
             </table>
           </div>
         )}
+        
+        {/* Debug Information - Collapsible */}
+        <div className="border-t border-gray-200">
+          <div 
+            className="flex items-center justify-between cursor-pointer p-4 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-colors duration-200"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <span className="font-medium">🔧 Debug Info</span>
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-gray-500">
+                Total: {events.length} | Latest: {events.length > 0 ? events[0]?.class : 'None'}
+              </span>
+              <svg 
+                className={`w-4 h-4 transition-transform duration-200 ${showDebug ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          
+          {showDebug && (
+            <div className="px-4 pb-4 space-y-3">
+              {/* Debug Log */}
+              <div className="p-3 bg-gray-50 rounded text-xs font-mono max-h-24 overflow-y-auto">
+                <div className="font-semibold mb-2 text-gray-700">Debug Log:</div>
+                {debugLog.map((log, index) => (
+                  <div key={index} className="text-gray-600">{log}</div>
+                ))}
+              </div>
+              
+              {/* Events Info Display */}
+              <div className="p-3 bg-blue-50 rounded text-sm">
+                <div><strong>Total Events:</strong> {events.length}</div>
+                {events.length > 0 && (
+                  <>
+                    <div><strong>Latest Event:</strong> {new Date(events[0]?.timestamp * 1000).toLocaleString()}</div>
+                    <div><strong>Latest Class:</strong> {events[0]?.class}</div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
