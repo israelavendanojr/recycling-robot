@@ -3,11 +3,16 @@
 # Camera node parameters
 camera_node:
   ros__parameters:
-    stream_url: 'http://host.docker.internal:8554/feed.mjpg'
     device_id: 0
     width: 640
     height: 480
     fps: 10.0
+    publish_rate: 0.1  # 10 FPS = 0.1s interval
+    image_quality: 85
+    snapshot_enabled: true
+    snapshot_path: '/shared/current_frame.jpg'
+    retry_attempts: 3
+    retry_delay: 1.0
 
 # Classifier node parameters
 classifier_node:

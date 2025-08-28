@@ -98,10 +98,7 @@ def generate_launch_description():
             name='camera_node',
             output='screen',
             condition=IfCondition(LaunchConfiguration('use_real_camera')),
-            parameters=[{
-                'device_id': 0,
-                'fps': 10.0
-            }]
+            parameters=[os.path.join(package_share_dir, 'config', 'camera.yaml')]
         ),
 
         # --- Classifier node ---

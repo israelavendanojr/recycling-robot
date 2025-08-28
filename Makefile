@@ -41,7 +41,26 @@ launch-robot: ## Launch the complete robot system
 		cd /workspace/ros2_ws && \
 		source /opt/ros/humble/setup.bash && \
 		source install/setup.bash && \
-		ros2 launch recycling_robot robot.launch.py \
+		ros2 launch recycling_robot robot.launch.py use_real_camera:=true\
+	"
+	@echo "✅ Robot system stopped"
+
+launch-robot-mock: ## Launch the complete robot system
+	@echo "🚀 Launching recycling robot with synchronous pipeline..."
+	@echo "Ensuring frontend container is running..."
+	@if ! docker compose ps web | grep -q "Up"; then \
+		echo "Starting frontend service..."; \
+		docker compose up -d web; \
+		sleep 5; \
+	else \
+		echo "Frontend service already running"; \
+	fi
+	@echo "Starting ROS2 pipeline (Ctrl+C to stop)..."
+	docker compose exec ros2 bash -c " \
+		cd /workspace/ros2_ws && \
+		source /opt/ros/humble/setup.bash && \
+		source install/setup.bash && \
+		ros2 launch recycling_robot robot.launch.py use_real_camera:=false\
 	"
 	@echo "✅ Robot system stopped"
 
