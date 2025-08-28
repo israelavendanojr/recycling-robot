@@ -4,17 +4,12 @@ A ROS2-based recycling robot that automatically classifies and sorts recyclable 
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. First Boot
 ```bash
-make install
+make run
 ```
 
-### 2. Start Services
-```bash
-make up
-```
-
-### 3. Launch ROS2 Robot
+### 3. Launch Robot
 ```bash
 make launch-robot
 ```
