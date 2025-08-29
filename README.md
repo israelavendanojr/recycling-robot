@@ -47,3 +47,8 @@ recycling-robot/
 ├── Makefile                         # Build and test commands
 
 ```
+
+### Add to CI/CD Later
+- Docker image building
+- Integration tests with hardware
+- Actual CD + Deployment steps

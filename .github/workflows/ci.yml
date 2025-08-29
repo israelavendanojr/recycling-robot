@@ -7,41 +7,96 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  ci-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      # 1. Checkout repo
+      # 1. Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Setup Python (for backend tests)
-      - name: Setup Python
+      # 2. Backend Python Testing
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Install backend dependencies (adjust if you use poetry/pipenv)
       - name: Install backend dependencies
         run: |
-          pip install -r backend/requirements.txt
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+        timeout-minutes: 2
 
-      # 4. Run backend tests (replace with pytest/unittest/etc.)
       - name: Run backend tests
-        run: pytest backend || echo "No backend tests yet"
+        run: |
+          cd backend
+          python -m pytest test_basic.py -v --tb=short
+        timeout-minutes: 3
 
-      # 5. Setup Node (for frontend checks)
-      - name: Setup Node.js
+      # 3. Frontend Build Verification
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
 
-      # 6. Install frontend deps
       - name: Install frontend dependencies
         working-directory: web
         run: npm ci
+        timeout-minutes: 2
 
-      # 7. Build frontend (adjust if using Vite/React)
-      - name: Build frontend
+      - name: Verify TypeScript compilation
         working-directory: web
         run: npm run build
+        timeout-minutes: 3
+
+      - name: Verify build artifacts
+        working-directory: web
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Build artifacts not found in dist/ directory"
+            exit 1
+          fi
+          echo "✅ Build artifacts created successfully"
+          ls -la dist/
+        timeout-minutes: 1
+
+      # 4. Docker Configuration Validation
+      - name: Validate Docker Compose configuration
+        run: |
+          echo "🔍 Validating Docker Compose configuration..."
+          if ! docker compose config -q; then
+            echo "❌ Docker Compose configuration validation failed"
+            docker compose config
+            exit 1
+          fi
+          echo "✅ Docker Compose configuration is valid"
+          
+          # Check that all services are properly defined
+          services=$(docker compose config --services)
+          expected_services=("backend" "ros2" "web")
+          
+          for service in "${expected_services[@]}"; do
+            if echo "$services" | grep -q "^$service$"; then
+              echo "✅ Service '$service' found"
+            else
+              echo "❌ Service '$service' not found in docker-compose.yml"
+              exit 1
+            fi
+          done
+        timeout-minutes: 2
+
+      # 5. Final Status
+      - name: CI Pipeline Status
+        if: success()
+        run: |
+          echo "🎉 All CI checks passed successfully!"
+          echo "✅ Backend tests completed"
+          echo "✅ Frontend build successful"
+          echo "✅ Docker configuration valid"
+          echo "✅ TypeScript compilation passed"
+          echo ""
+          echo "🚀 Ready for deployment or merge!"
