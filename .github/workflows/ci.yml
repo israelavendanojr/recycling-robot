@@ -45,8 +45,12 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: web
-        run: npm ci
-        timeout-minutes: 2
+        run: |
+          # Clean install to avoid dependency issues
+          rm -rf node_modules package-lock.json
+          # Use npm install which is more reliable for this project
+          npm install
+        timeout-minutes: 3
 
       - name: Verify TypeScript compilation
         working-directory: web
