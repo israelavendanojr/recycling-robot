@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
-from std_msgs.msg import String
+from std_msgs.msg import String, Empty
 import os, io, time
 from PIL import Image
 
@@ -35,6 +35,14 @@ class MockCameraNode(Node):
         # Publisher (use the pipeline topic for downstream nodes)
         self.publisher = self.create_publisher(CompressedImage, '/pipeline/image_raw', 10)
 
+        # Manual capture subscription
+        self.capture_sub = self.create_subscription(
+            Empty, 
+            '/camera/capture', 
+            self.manual_capture_callback, 
+            10
+        )
+
         # Pipeline state subscription
         self.pipeline_state_sub = self.create_subscription(
             String, 
@@ -49,15 +57,24 @@ class MockCameraNode(Node):
         self.pipeline_state = "idle"  # Track pipeline state
         self._load_test_images()
 
-        # Timer
-        self.timer = self.create_timer(self.publish_rate, self.publish_test_image)
+        # Timer (only if publish_rate > 0)
+        if self.publish_rate > 0:
+            self.timer = self.create_timer(self.publish_rate, self.publish_test_image)
 
         self.get_logger().info('[MockCamera] Mock camera node started')
         self.get_logger().info(f'[MockCamera] Image folder: {self.image_folder}')
-        self.get_logger().info(f'[MockCamera] Publish rate: {self.publish_rate}s')
+        if self.publish_rate > 0:
+            self.get_logger().info(f'[MockCamera] Publish rate: {self.publish_rate}s')
+        else:
+            self.get_logger().info('[MockCamera] Manual capture mode active')
         self.get_logger().info(f'[MockCamera] Found {len(self.test_images)} test images')
         if self.snapshot_enabled:
             self.get_logger().info(f'[MockCamera] Snapshot path: {self.snapshot_path}')
+
+    def manual_capture_callback(self, msg):
+        """Handle manual capture request from ROS2 topic"""
+        self.get_logger().info('[MockCamera] Manual capture requested')
+        self.publish_test_image()
 
     def pipeline_state_callback(self, msg):
         """Handle pipeline state updates"""

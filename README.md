@@ -4,7 +4,7 @@ A ROS2-based recycling robot that automatically classifies and sorts recyclable 
 
 ## Quick Start
 
-### 1. First Boot
+### 1. Complete Launch
 ```bash
 make run
 ```
@@ -13,6 +13,9 @@ make run
 ```bash
 make launch-robot
 ```
+
+http://localhost:5173
+
 
 
 ## Architecture

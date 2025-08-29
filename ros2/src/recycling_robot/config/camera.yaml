@@ -7,7 +7,7 @@ camera_node:
     width: 640
     height: 480
     fps: 10.0
-    publish_rate: 0.1  # 10 FPS = 0.1s interval
+    publish_rate: 0.0  # Manual capture only - no automatic publishing
     image_quality: 85
     snapshot_enabled: true
     snapshot_path: '/shared/current_frame.jpg'
@@ -24,6 +24,6 @@ classifier_node:
 # Mock camera node parameters
 mock_camera_node:
   ros__parameters:
-    publish_rate: 3.0
+    publish_rate: 0.0  # Manual capture only - no automatic publishing
     image_quality: 85
     auto_fallback: true

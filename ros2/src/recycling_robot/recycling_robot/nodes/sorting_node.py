@@ -77,7 +77,7 @@ class SortingNode(Node):
             sorting_action = self._get_sorting_action(material_class)
             
             if sorting_action:
-                self.get_logger().info(f'🔄 [SortingNode] Processing: {material_class.upper()}')
+                self.get_logger().info(f'[SortingNode] Processing: {material_class.upper()}')
                 
                 # Simulate sorting delay
                 time.sleep(self.sorting_delay)
@@ -86,7 +86,7 @@ class SortingNode(Node):
                 self._control_actuator(sorting_action)
                 
                 # Log completion
-                self.get_logger().info(f'✅ [SortingNode] Processing completed: {material_class}')
+                self.get_logger().info('[Sorter] Sorting Complete')
                 
                 # Notify pipeline coordinator of completion
                 completion_msg = String()
@@ -97,7 +97,6 @@ class SortingNode(Node):
                     'timestamp': time.time()
                 })
                 self.pipeline_completion_pub.publish(completion_msg)
-                self.get_logger().info('📤 [SortingNode] Notified pipeline coordinator of completion')
                 
             else:
                 self.get_logger().warn(f'[SortingNode] Unknown material class: {material_class}')
@@ -131,15 +130,15 @@ class SortingNode(Node):
 
     def _control_actuator(self, action):
         """Control motor for 1 second on any classification"""
-        self.get_logger().info(f'⚡ [Motor] Starting motor for classification: {action}')
+        self.get_logger().info(f'[Motor] Starting motor for classification: {action}')
         try:
-            self.get_logger().info('🔄 [Motor] Motor forward (speed=0.80) for 1 second')
+            self.get_logger().info('[Motor] Motor forward (speed=0.80) for 1 second')
             self.motor.forward(0.8)
             time.sleep(1.0)  # Spin for exactly 1 second
             self.motor.stop()
-            self.get_logger().info('⏹️ [Motor] Motor stop - cycle completed')
+            self.get_logger().info('[Motor] Motor stop - cycle completed')
         except Exception as e:
-            self.get_logger().error(f'❌ [Motor] Motor failed: {e}')
+            self.get_logger().error(f'[Motor] Motor failed: {e}')
 def main(args=None):
     rclpy.init(args=args)
     node = SortingNode()

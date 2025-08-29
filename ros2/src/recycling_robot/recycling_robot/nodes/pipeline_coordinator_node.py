@@ -55,7 +55,6 @@ class PipelineCoordinatorNode(Node):
         
         self.get_logger().info('[PipelineCoordinator] Pipeline coordinator started')
         self.get_logger().info(f'[PipelineCoordinator] Timeout: {self.timeout_seconds}s')
-        self.get_logger().info('[PipelineCoordinator] Initial state: idle')
 
     def publish_state(self):
         """Publish current pipeline state"""
@@ -67,13 +66,11 @@ class PipelineCoordinatorNode(Node):
             # Also persist to file for backend access
             self._persist_state()
             
-            # Visual indicators for terminal
+            # Clean status logging
             if self.state == "idle":
-                self.get_logger().info("🟢 PIPELINE: READY FOR NEXT ITEM")
+                self.get_logger().info("[PipelineCoordinator] Ready")
             else:
-                self.get_logger().info("🔴 PIPELINE: PROCESSING IN PROGRESS...")
-            
-            self.get_logger().debug(f'[PipelineCoordinator] Published state: {self.state}')
+                self.get_logger().info("[PipelineCoordinator] Processing in progress...")
             
         except Exception as e:
             self.get_logger().error(f'[PipelineCoordinator] Failed to publish state: {e}')
@@ -114,8 +111,7 @@ class PipelineCoordinatorNode(Node):
             self.state = "processing"
             self.last_state_change = time.time()
             
-            self.get_logger().info(f'🔄 [PipelineCoordinator] TRANSITION: idle → processing')
-            self.get_logger().info(f'📦 [PipelineCoordinator] Processing item: {classification_data.get("class", "unknown")}')
+            self.get_logger().info(f'[Classifier] Classification Done: {classification_data.get("class", "unknown")}')
             self.publish_state()
             
         except Exception as e:
@@ -133,8 +129,6 @@ class PipelineCoordinatorNode(Node):
             self.last_state_change = time.time()
             self.current_item = None
             
-            self.get_logger().info('🔄 [PipelineCoordinator] TRANSITION: processing → idle')
-            self.get_logger().info('✅ [PipelineCoordinator] Item processing completed successfully')
             self.publish_state()
             
         except Exception as e:

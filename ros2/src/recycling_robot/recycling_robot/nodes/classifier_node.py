@@ -344,7 +344,7 @@ class ClassifierNode(Node):
             
         # Skip if pipeline is busy
         if self.pipeline_state == "processing":
-            self.get_logger().info('⏸️ [Classifier] Pipeline busy, skipping classification (waiting for sorting to complete)')
+            self.get_logger().debug('[Classifier] Pipeline busy, skipping classification')
             return
             
         try:
@@ -385,10 +385,9 @@ class ClassifierNode(Node):
             completion_msg = String()
             completion_msg.data = json.dumps(result)
             self.pipeline_completion_pub.publish(completion_msg)
-            self.get_logger().info('📤 [Classifier] Notified pipeline coordinator of classification completion')
             
             # Log successful classification
-            self.get_logger().info(f'🎯 [Classifier] Classification complete: {predicted_class} ({confidence*100:.1f}% confidence)')
+            self.get_logger().info(f'[Classifier] Classification Done: {predicted_class}')
             
         except Exception as e:
             self.get_logger().error(f'[Classifier] Auto-classify failed: {e}')

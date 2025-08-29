@@ -38,6 +38,7 @@ setup(
             'classifier_node = recycling_robot.nodes.classifier_node:main',
             'sorting_node = recycling_robot.nodes.sorting_node:main',
             'pipeline_coordinator_node = recycling_robot.nodes.pipeline_coordinator_node:main',
+            'key_input_node = recycling_robot.nodes.key_input_node:main',
         ],
     },
 )

@@ -12,16 +12,16 @@ def generate_launch_description():
     default_images = os.path.join(package_share_dir, 'test_images')
     
     # Launch arguments
-    use_real_camera_arg = DeclareLaunchArgument(
-        'use_real_camera',
-        default_value='false',
-        description='Use real camera instead of mock camera'
-    )
-    
     image_folder_arg = DeclareLaunchArgument(
         'image_folder',
         default_value=default_images,
-        description='Folder of test images for MockCameraNode'
+        description='Folder of test images for MockCameraNode (when use_mock_camera=true)'
+    )
+    
+    use_mock_camera_arg = DeclareLaunchArgument(
+        'use_mock_camera',
+        default_value='false',
+        description='Use mock camera instead of real camera (for testing)'
     )
     
     backend_url_arg = DeclareLaunchArgument(
@@ -35,13 +35,13 @@ def generate_launch_description():
     
     return LaunchDescription([
         # Launch arguments
-        use_real_camera_arg,
         image_folder_arg,
+        use_mock_camera_arg,
         backend_url_arg,
         
         # Startup logging
         ExecuteProcess(
-            cmd=['echo', '[LAUNCH] 🚀 Starting Recycling Robot with Synchronous Pipeline...'],
+            cmd=['echo', '[LAUNCH] 🚀 Starting Recycling Robot with Manual Capture Pipeline...'],
             name='startup_log_1',
             output='screen'
         ),
@@ -76,29 +76,29 @@ def generate_launch_description():
             ]
         ),
         
-        # --- Mock Camera node (default) ---
-        Node(
-            package='recycling_robot',
-            executable='mock_camera_node',
-            name='mock_camera_node',
-            output='screen',
-            condition=UnlessCondition(LaunchConfiguration('use_real_camera')),
-            parameters=[{
-                'image_folder': LaunchConfiguration('image_folder'),
-                'publish_rate': 3.0,
-                'image_quality': 85,
-                'auto_fallback': True
-            }]
-        ),
-        
-        # --- Real Camera node (when use_real_camera=true) ---
+        # --- Real Camera node (default) ---
         Node(
             package='recycling_robot',
             executable='camera_node',
             name='camera_node',
             output='screen',
-            condition=IfCondition(LaunchConfiguration('use_real_camera')),
+            condition=UnlessCondition(LaunchConfiguration('use_mock_camera')),
             parameters=[os.path.join(package_share_dir, 'config', 'camera.yaml')]
+        ),
+        
+        # --- Mock Camera node (only when use_mock_camera=true) ---
+        Node(
+            package='recycling_robot',
+            executable='mock_camera_node',
+            name='mock_camera_node',
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('use_mock_camera')),
+            parameters=[{
+                'image_folder': LaunchConfiguration('image_folder'),
+                'publish_rate': 0.0,  # Manual capture only
+                'image_quality': 85,
+                'auto_fallback': True
+            }]
         ),
 
         # --- Classifier node ---
@@ -125,6 +125,9 @@ def generate_launch_description():
                 'sorting_delay': 1.0
             }]
         ),
+        
+        # Key input is handled by host-side key_listener.py
+        # No key_input_node needed in ROS2 launch
         
         # Simple pipeline status check
         TimerAction(
