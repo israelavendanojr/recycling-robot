@@ -36,15 +36,14 @@ Camera → Classifier → Sorting → Complete → Next Item
 recycling-robot/
 ├── ros2/src/recycling_robot/          # ROS2 package
 │   ├── nodes/                         # ROS2 nodes
-│   │   ├── pipeline_coordinator_node.py  # Pipeline coordinator
-│   │   ├── camera_node.py            # Real camera
-│   │   ├── mock_camera_node.py       # Mock camera
-│   │   ├── classifier_node.py        # ML classifier
+│   │   ├── pipeline_coordinator_node.py  # Pipeline State Manager
+│   │   ├── camera_node.py            # Live camera
+│   │   ├── classifier_node.py        # TorchScript classifier
 │   │   └── sorting_node.py           # Motor control
 │   ├── launch/                       # Launch files
 │   └── setup.py                      # Package configuration
 ├── backend/                          # Flask API
-├── web/                             # React frontend
+├── web/                             # React dashboard / controller
 ├── Makefile                         # Build and test commands
 
 ```
