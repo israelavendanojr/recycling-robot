@@ -61,23 +61,23 @@ jobs:
         working-directory: web
         run: |
           if [ ! -d "dist" ]; then
-            echo "❌ Build artifacts not found in dist/ directory"
+            echo "Build artifacts not found in dist/ directory"
             exit 1
           fi
-          echo "✅ Build artifacts created successfully"
+          echo "Build artifacts created successfully"
           ls -la dist/
         timeout-minutes: 1
 
       # 4. Docker Configuration Validation
       - name: Validate Docker Compose configuration
         run: |
-          echo "🔍 Validating Docker Compose configuration..."
+          echo "Validating Docker Compose configuration..."
           if ! docker compose config -q; then
-            echo "❌ Docker Compose configuration validation failed"
+            echo "Docker Compose configuration validation failed"
             docker compose config
             exit 1
           fi
-          echo "✅ Docker Compose configuration is valid"
+          echo "Docker Compose configuration is valid"
           
           # Check that all services are properly defined
           services=$(docker compose config --services)
@@ -85,9 +85,9 @@ jobs:
           
           for service in "${expected_services[@]}"; do
             if echo "$services" | grep -q "^$service$"; then
-              echo "✅ Service '$service' found"
+              echo "Service '$service' found"
             else
-              echo "❌ Service '$service' not found in docker-compose.yml"
+              echo "Service '$service' not found in docker-compose.yml"
               exit 1
             fi
           done
@@ -97,10 +97,10 @@ jobs:
       - name: CI Pipeline Status
         if: success()
         run: |
-          echo "🎉 All CI checks passed successfully!"
-          echo "✅ Backend tests completed"
-          echo "✅ Frontend build successful"
-          echo "✅ Docker configuration valid"
-          echo "✅ TypeScript compilation passed"
+          echo "All CI checks passed successfully!"
+          echo "Backend tests completed"
+          echo "Frontend build successful"
+          echo "Docker configuration valid"
+          echo "TypeScript compilation passed"
           echo ""
-          echo "🚀 Ready for deployment or merge!"
+          echo "Ready for deployment or merge!"
