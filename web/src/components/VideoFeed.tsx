@@ -12,35 +12,35 @@ export function VideoFeed() {
     setDebugLog(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
-  useEffect(() => {
-    const fetchImage = async () => {
-      try {
-        addDebugLog('Fetching current image...');
-        const info = await fetchCurrentImage();
-        if (info) {
-          setImageInfo(info);
-          setError(false);
-          setLoading(false);
-          addDebugLog(`Successfully loaded image: ${info.image_url}`);
-        } else {
-          setError(true);
-          setLoading(false);
-          addDebugLog('No image info received');
-        }
-      } catch (e) {
-        addDebugLog(`Failed to fetch image: ${e}`);
-        console.error('[VideoFeed] Failed to fetch image:', e);
-        setError(true);
-        setLoading(false);
-      }
-    };
+      useEffect(() => {
+        const fetchImage = async () => {
+            try {
+                addDebugLog('Fetching current image...');
+                const info = await fetchCurrentImage();
+                if (info) {
+                    setImageInfo(info);
+                    setError(false);
+                    setLoading(false);
+                    addDebugLog(`Successfully loaded image: ${info.image_url}`);
+                } else {
+                    setError(true);
+                    setLoading(false);
+                    addDebugLog('No image info received');
+                }
+            } catch (e) {
+                addDebugLog(`Failed to fetch image: ${e}`);
+                console.error('[VideoFeed] Failed to fetch image:', e);
+                setError(true);
+                setLoading(false);
+            }
+        };
 
-    fetchImage();
-    
-    // Refresh image every 100ms for smooth streaming
-    const interval = setInterval(fetchImage, 100);
-    return () => clearInterval(interval);
-  }, []);
+        fetchImage();
+        
+        // Refresh image every 2 seconds for manual mode (slower polling since images change less frequently)
+        const interval = setInterval(fetchImage, 2000);
+        return () => clearInterval(interval);
+    }, []);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

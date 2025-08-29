@@ -71,6 +71,7 @@ class CameraNode(Node):
             self.get_logger().info('[Camera] Ready')
             self.get_logger().info('[Camera] Manual capture mode active')
             self.get_logger().info('[Camera] Use: ros2 topic pub /camera/capture std_msgs/msg/Empty')
+            self.get_logger().info('[Camera] Waiting for manual capture requests...')
         else:
             # Retry initialization periodically
             self.timer = self.create_timer(self.reconnect_cooldown, self._retry_camera_initialization)
@@ -278,6 +279,10 @@ class CameraNode(Node):
                     self.get_logger().error(f'[Camera] Both JPEG and PNG encoding failed: {png_error}')
                     return
 
+            # Write snapshot for backend FIRST (ensure image is saved)
+            self._write_snapshot_atomic(image_bytes, format_type)
+            self.get_logger().info(f'[Camera] Image saved to /shared/current_frame.{format_type.lower()}')
+
             # Publish on ROS2 pipeline topic
             msg = CompressedImage()
             msg.format = 'jpeg' if format_type == 'JPEG' else 'png'
@@ -285,9 +290,6 @@ class CameraNode(Node):
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = 'camera_frame'
             self.publisher.publish(msg)
-
-            # Write snapshot for backend
-            self._write_snapshot_atomic(image_bytes, format_type)
 
             self.get_logger().info('[Camera] Frame Captured → published to /pipeline/image_raw')
 

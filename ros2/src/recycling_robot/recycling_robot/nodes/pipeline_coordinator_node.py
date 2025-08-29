@@ -24,6 +24,7 @@ class PipelineCoordinatorNode(Node):
         self.state = "idle"  # "idle" or "processing"
         self.last_state_change = time.time()
         self.current_item = None
+        self.processing_start_time = None
         
         # Publishers
         self.state_publisher = self.create_publisher(
@@ -55,6 +56,7 @@ class PipelineCoordinatorNode(Node):
         
         self.get_logger().info('[PipelineCoordinator] Pipeline coordinator started')
         self.get_logger().info(f'[PipelineCoordinator] Timeout: {self.timeout_seconds}s')
+        self.get_logger().info('[PipelineCoordinator] Manual mode active - waiting for capture triggers')
 
     def publish_state(self):
         """Publish current pipeline state"""
@@ -68,9 +70,10 @@ class PipelineCoordinatorNode(Node):
             
             # Clean status logging
             if self.state == "idle":
-                self.get_logger().info("[PipelineCoordinator] Ready")
+                self.get_logger().info("[PipelineCoordinator] Ready for manual capture")
             else:
-                self.get_logger().info("[PipelineCoordinator] Processing in progress...")
+                elapsed = time.time() - self.processing_start_time if self.processing_start_time else 0
+                self.get_logger().info(f"[PipelineCoordinator] Processing in progress... ({elapsed:.1f}s)")
             
         except Exception as e:
             self.get_logger().error(f'[PipelineCoordinator] Failed to publish state: {e}')
@@ -82,7 +85,8 @@ class PipelineCoordinatorNode(Node):
                 'state': self.state,
                 'timestamp': time.time(),
                 'last_change': self.last_state_change,
-                'current_item': self.current_item
+                'current_item': self.current_item,
+                'processing_start_time': self.processing_start_time
             }
             
             # Write to temporary file first, then atomic replace
@@ -110,8 +114,9 @@ class PipelineCoordinatorNode(Node):
             # Transition to processing state
             self.state = "processing"
             self.last_state_change = time.time()
+            self.processing_start_time = time.time()
             
-            self.get_logger().info(f'[Classifier] Classification Done: {classification_data.get("class", "unknown")}')
+            self.get_logger().info(f'[PipelineCoordinator] Classification Complete: {classification_data.get("class", "unknown")} → Starting sorting')
             self.publish_state()
             
         except Exception as e:
@@ -124,11 +129,19 @@ class PipelineCoordinatorNode(Node):
                 self.get_logger().warn('[PipelineCoordinator] Received sorting_done while not processing, ignoring')
                 return
             
+            # Parse sorting result
+            sorting_data = json.loads(msg.data)
+            
+            # Calculate total processing time
+            total_time = time.time() - self.processing_start_time if self.processing_start_time else 0
+            
             # Transition back to idle state
             self.state = "idle"
             self.last_state_change = time.time()
             self.current_item = None
+            self.processing_start_time = None
             
+            self.get_logger().info(f'[PipelineCoordinator] Sorting Complete: {sorting_data.get("material", "unknown")} → Pipeline ready for next capture ({total_time:.1f}s total)')
             self.publish_state()
             
         except Exception as e:
@@ -145,6 +158,7 @@ class PipelineCoordinatorNode(Node):
                     self.state = "idle"
                     self.last_state_change = time.time()
                     self.current_item = None
+                    self.processing_start_time = None
                     self.publish_state()
             
             # Periodically persist state

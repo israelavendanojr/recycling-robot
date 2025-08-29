@@ -27,7 +27,7 @@ class ClassifierNode(Node):
         
         # Parameters
         self.declare_parameter('api_base_url', os.getenv('BACKEND_URL', 'http://backend:8000'))
-        self.declare_parameter('inference_interval', 3.0)
+        self.declare_parameter('inference_interval', 0.0)  # Disable auto-classification timer
         self.declare_parameter('confidence_threshold', 0.7)
         self.declare_parameter('model_path', 'src/recycling_robot/recycling_robot/models/recycler.pt')
         
@@ -39,6 +39,7 @@ class ClassifierNode(Node):
         
         # State
         self.latest_image = None
+        self.last_processed_image_hash = None  # Track processed images
         self.classes = ['cardboard', 'glass', 'metal', 'plastic', 'trash']
         self._running = True
         self._backend_ready = False
@@ -58,11 +59,12 @@ class ClassifierNode(Node):
         self.get_logger().info('[Classifier] Classifier node started')
         self.get_logger().info(f'[Classifier] API endpoint: {self.api_base_url}')
         self.get_logger().info(f'[Classifier] Using device: {self.device}')
+        self.get_logger().info('[Classifier] Manual mode active - no auto-classification timer')
         
         # Wait for backend before starting subscriptions and timers
         self._wait_for_backend()
         
-        # Only create subscriptions and timer after backend is ready
+        # Only create subscriptions after backend is ready
         if self._running:  # Check if we haven't been shutdown during backend wait
             self.subscription = self.create_subscription(
                 CompressedImage, '/pipeline/image_raw', self.image_callback, 10
@@ -90,8 +92,14 @@ class ClassifierNode(Node):
                 10
             )
             
-            # Auto-classify timer
-            self.timer = self.create_timer(self.interval, self.auto_classify)
+            # Only create timer if interval > 0 (manual mode = 0)
+            if self.interval > 0:
+                self.timer = self.create_timer(self.interval, self.auto_classify)
+                self.get_logger().info(f'[Classifier] Auto-classification timer active: {self.interval}s')
+            else:
+                self.timer = None
+                self.get_logger().info('[Classifier] Manual mode: No auto-classification timer')
+            
             self.get_logger().info('[Classifier] Backend ready, classification service active')
         else:
             self.get_logger().error('[Classifier] Failed to start classification service - backend unavailable')
@@ -321,6 +329,15 @@ class ClassifierNode(Node):
             self.get_logger().error(f'[Classifier] Inference failed: {e}')
             return None, 0.0
 
+    def _get_image_hash(self, compressed_image_msg):
+        """Generate a simple hash for the image to detect duplicates"""
+        try:
+            # Use timestamp and data length as a simple hash
+            return f"{compressed_image_msg.header.stamp.sec}_{compressed_image_msg.header.stamp.nanosec}_{len(compressed_image_msg.data)}"
+        except Exception:
+            # Fallback to data length only
+            return str(len(compressed_image_msg.data))
+
     def pipeline_state_callback(self, msg):
         """Handle pipeline state updates"""
         try:
@@ -330,26 +347,38 @@ class ClassifierNode(Node):
             self.get_logger().error(f'[Classifier] Pipeline state callback error: {e}')
 
     def image_callback(self, msg):
-        """Handle incoming image messages with clean logging"""
+        """Handle incoming image messages with immediate classification in manual mode"""
         try:
+            # Check if this is a new image (not already processed)
+            image_hash = self._get_image_hash(msg)
+            
+            if image_hash == self.last_processed_image_hash:
+                self.get_logger().debug('[Classifier] Duplicate image detected, skipping')
+                return
+            
+            # Store the new image
             self.latest_image = msg
-            self.get_logger().debug('[Classifier] Received image from camera')
+            self.last_processed_image_hash = image_hash
+            
+            self.get_logger().info('[Classifier] New image received, processing immediately')
+            
+            # In manual mode, process the image immediately
+            if self.interval == 0.0:
+                self._process_image(msg)
+            
         except Exception as e:
             self.get_logger().error(f'[Classifier] Image callback error: {e}')
 
-    def auto_classify(self):
-        """Auto-classify latest image with clean logging"""
-        if not self._running or self.latest_image is None:
-            return
-            
-        # Skip if pipeline is busy
-        if self.pipeline_state == "processing":
-            self.get_logger().debug('[Classifier] Pipeline busy, skipping classification')
-            return
-            
+    def _process_image(self, image_msg):
+        """Process a single image for classification"""
         try:
+            # Skip if pipeline is busy
+            if self.pipeline_state == "processing":
+                self.get_logger().info('[Classifier] Pipeline busy, skipping classification')
+                return
+            
             # Preprocess image
-            image_tensor = self._preprocess_image(self.latest_image)
+            image_tensor = self._preprocess_image(image_msg)
             if image_tensor is None:
                 return
             
@@ -360,7 +389,7 @@ class ClassifierNode(Node):
             
             # Check confidence threshold
             if confidence < self.threshold:
-                self.get_logger().debug(f'[Classifier] Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
+                self.get_logger().info(f'[Classifier] Low confidence prediction: {predicted_class} ({confidence*100:.1f}%) < {self.threshold*100:.1f}%')
                 return
             
             # Create result
@@ -387,10 +416,23 @@ class ClassifierNode(Node):
             self.pipeline_completion_pub.publish(completion_msg)
             
             # Log successful classification
-            self.get_logger().info(f'[Classifier] Classification Done: {predicted_class}')
+            self.get_logger().info(f'[Classifier] Classification Complete: {predicted_class} ({confidence*100:.1f}%)')
             
         except Exception as e:
-            self.get_logger().error(f'[Classifier] Auto-classify failed: {e}')
+            self.get_logger().error(f'[Classifier] Image processing failed: {e}')
+
+    def auto_classify(self):
+        """Auto-classify latest image (only called if timer is active)"""
+        if not self._running or self.latest_image is None:
+            return
+            
+        # Skip if pipeline is busy
+        if self.pipeline_state == "processing":
+            self.get_logger().debug('[Classifier] Pipeline busy, skipping classification')
+            return
+            
+        # Process the latest image
+        self._process_image(self.latest_image)
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""

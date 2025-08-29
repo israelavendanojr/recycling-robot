@@ -2,28 +2,14 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.conditions import IfCondition, UnlessCondition
 from ament_index_python.packages import get_package_share_directory
 import os
 
 def generate_launch_description():
     # Get the package share directory for default paths
     package_share_dir = get_package_share_directory('recycling_robot')
-    default_images = os.path.join(package_share_dir, 'test_images')
     
     # Launch arguments
-    image_folder_arg = DeclareLaunchArgument(
-        'image_folder',
-        default_value=default_images,
-        description='Folder of test images for MockCameraNode (when use_mock_camera=true)'
-    )
-    
-    use_mock_camera_arg = DeclareLaunchArgument(
-        'use_mock_camera',
-        default_value='false',
-        description='Use mock camera instead of real camera (for testing)'
-    )
-    
     backend_url_arg = DeclareLaunchArgument(
         'backend_url',
         default_value='http://backend:8000',
@@ -35,8 +21,6 @@ def generate_launch_description():
     
     return LaunchDescription([
         # Launch arguments
-        image_folder_arg,
-        use_mock_camera_arg,
         backend_url_arg,
         
         # Startup logging
@@ -76,29 +60,13 @@ def generate_launch_description():
             ]
         ),
         
-        # --- Real Camera node (default) ---
+        # --- Real Camera node ---
         Node(
             package='recycling_robot',
             executable='camera_node',
             name='camera_node',
             output='screen',
-            condition=UnlessCondition(LaunchConfiguration('use_mock_camera')),
             parameters=[os.path.join(package_share_dir, 'config', 'camera.yaml')]
-        ),
-        
-        # --- Mock Camera node (only when use_mock_camera=true) ---
-        Node(
-            package='recycling_robot',
-            executable='mock_camera_node',
-            name='mock_camera_node',
-            output='screen',
-            condition=IfCondition(LaunchConfiguration('use_mock_camera')),
-            parameters=[{
-                'image_folder': LaunchConfiguration('image_folder'),
-                'publish_rate': 0.0,  # Manual capture only
-                'image_quality': 85,
-                'auto_fallback': True
-            }]
         ),
 
         # --- Classifier node ---
@@ -109,7 +77,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'api_base_url': LaunchConfiguration('backend_url'),
-                'inference_interval': 3.0,
+                'inference_interval': 0.0,  # Disable auto-classification timer
                 'confidence_threshold': 0.7,
                 'model_path': 'src/recycling_robot/recycling_robot/models/recycler.pt'
             }]

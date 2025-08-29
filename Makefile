@@ -32,8 +32,6 @@ launch-robot: ## Launch the complete robot system with manual camera capture
 	@docker compose up -d
 	@sleep 5
 	@echo "Starting ROS2 pipeline and key listener (Ctrl+C to stop)..."
-	@echo "📷 Camera will be ready - press 'c' to capture frames"
-	@echo "🔑 Key listener ready - press 'c' to capture, 'q' to quit"
 	@echo "Starting ROS2 pipeline in background..."
 	@docker compose exec -d ros2 bash -c " \
 		cd /workspace/ros2_ws && \
@@ -43,26 +41,7 @@ launch-robot: ## Launch the complete robot system with manual camera capture
 	"
 	@sleep 3
 	@echo "Starting key listener..."
-	@python3 simple_key_listener.py
-	@echo "✅ Robot system stopped"
-
-launch-robot-mock: ## Launch the complete robot system with mock camera
-	@echo "🚀 Launching recycling robot with mock camera pipeline..."
-	@echo "Ensuring frontend container is running..."
-	@if ! docker compose ps web | grep -q "Up"; then \
-		echo "Starting frontend service..."; \
-		docker compose up -d web; \
-		sleep 5; \
-	else \
-		echo "Frontend service already running"; \
-	fi
-	@echo "Starting ROS2 pipeline with mock camera (Ctrl+C to stop)..."
-	docker compose exec ros2 bash -c " \
-		cd /workspace/ros2_ws && \
-		source /opt/ros/humble/setup.bash && \
-		source install/setup.bash && \
-		ros2 launch recycling_robot robot.launch.py use_mock_camera:=true \
-	"
+	@python3 key_listener.py
 	@echo "✅ Robot system stopped"
 
 clean: ## Remove ROS2 build artifacts

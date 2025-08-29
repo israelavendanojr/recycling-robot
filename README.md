@@ -9,13 +9,15 @@ A ROS2-based recycling robot that automatically classifies and sorts recyclable 
 make run
 ```
 
-### 3. Launch Robot
+### 2. Only Launch Robot
 ```bash
 make launch-robot
 ```
 
+### Dashboard
+```bash
 http://localhost:5173
-
+```
 
 
 ## Architecture

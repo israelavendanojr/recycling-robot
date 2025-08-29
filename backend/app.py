@@ -437,8 +437,8 @@ def get_current_image():
 @app.route('/api/current_frame.jpg')
 def serve_current_frame():
     """
-    Serve the latest frame (JPG or PNG) saved by the mock/real camera.
-    Handles fallback from JPG to PNG automatically.
+    Serve the latest frame (JPG or PNG) saved by the real camera.
+    Handles fallback from JPG to PNG automatically with proper cache-busting.
     """
     try:
         frame_path, mime_type = get_current_frame_path()
@@ -446,9 +446,19 @@ def serve_current_frame():
         if not frame_path:
             raise NotFound("No current frame available")
         
-        # no-store avoids browser caching
+        # Add cache-busting headers to ensure latest image is always served
         resp = send_file(frame_path, mimetype=mime_type, as_attachment=False, max_age=0, conditional=False)
-        resp.headers['Cache-Control'] = 'no-store, max-age=0'
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        
+        # Add timestamp to help with debugging
+        try:
+            mtime = os.path.getmtime(frame_path)
+            resp.headers['Last-Modified'] = str(mtime)
+        except:
+            pass
+        
         return resp
         
     except NotFound as e:

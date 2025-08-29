@@ -38,20 +38,41 @@ class SortingNode(Node):
         # State
         self.latest_classification = None
         self.sorting_busy = False
+        self.last_processed_classification_hash = None  # Track processed classifications
         
         self.get_logger().info('[SortingNode] Sorting node started')
         self.get_logger().info(f'[SortingNode] Processing delay: {self.sorting_delay}s')
         self.get_logger().info('[SortingNode] Subscribed to /pipeline/classification_done')
         self.get_logger().info('[SortingNode] Will publish to /pipeline/sorting_done')
 
+    def _get_classification_hash(self, classification):
+        """Generate a simple hash for the classification to detect duplicates"""
+        try:
+            # Use timestamp and class as a simple hash
+            timestamp = classification.get('timestamp', time.time())
+            material_class = classification.get('class', 'unknown')
+            return f"{timestamp}_{material_class}"
+        except Exception:
+            # Fallback to class only
+            return classification.get('class', 'unknown')
+
     def classification_callback(self, msg):
         """Handle incoming classification completion messages"""
         try:
             # Parse classification result
             classification = json.loads(msg.data)
-            self.latest_classification = classification
             
-            self.get_logger().info(f'[SortingNode] Received classification: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
+            # Check if this is a duplicate classification
+            classification_hash = self._get_classification_hash(classification)
+            if classification_hash == self.last_processed_classification_hash:
+                self.get_logger().debug('[SortingNode] Duplicate classification detected, skipping')
+                return
+            
+            # Store the new classification
+            self.latest_classification = classification
+            self.last_processed_classification_hash = classification_hash
+            
+            self.get_logger().info(f'[SortingNode] New classification received: {classification["class"]} ({classification["confidence"]*100:.1f}% confidence)')
             
             # Trigger sorting action
             self._perform_sorting(classification)
