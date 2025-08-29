@@ -125,6 +125,10 @@ class CameraNode(Node):
                     # Success!
                     self.camera_connected = True
                     self._log_camera_info()
+                    
+                    # Clear any stale frames from the buffer
+                    self._clear_camera_buffer()
+                    
                     self.get_logger().info(f'[Camera] ✅ Camera initialized successfully')
                     return True
 
@@ -168,10 +172,24 @@ class CameraNode(Node):
             # Enable auto-focus if supported
             self.camera.set(cv2.CAP_PROP_AUTOFOCUS, 1)
 
+            # Additional settings to ensure fresh frames
+            self.camera.set(cv2.CAP_PROP_CONVERT_RGB, True)
+
             self.get_logger().info('[Camera] Camera properties configured')
 
         except Exception as e:
             self.get_logger().warn(f'[Camera] Error configuring camera properties: {e}')
+
+    def _clear_camera_buffer(self):
+        """Clear any stale frames from the camera buffer"""
+        try:
+            if self.camera is not None and self.camera.isOpened():
+                # Grab and discard several frames to clear the buffer
+                for i in range(5):
+                    self.camera.grab()
+                self.get_logger().debug('[Camera] Camera buffer cleared')
+        except Exception as e:
+            self.get_logger().warn(f'[Camera] Failed to clear camera buffer: {e}')
 
     def _log_camera_info(self):
         """Log camera capabilities and current settings"""
@@ -181,21 +199,28 @@ class CameraNode(Node):
             actual_fps = self.camera.get(cv2.CAP_PROP_FPS)
             fourcc = int(self.camera.get(cv2.CAP_PROP_FOURCC))
             fourcc_str = ''.join([chr((fourcc >> 8 * i) & 0xFF) for i in range(4)])
+            buffer_size = int(self.camera.get(cv2.CAP_PROP_BUFFERSIZE))
 
             self.get_logger().info(f'[Camera] Resolution: {actual_width}x{actual_height}')
             self.get_logger().info(f'[Camera] FPS: {actual_fps}')
             self.get_logger().info(f'[Camera] Format: {fourcc_str}')
+            self.get_logger().info(f'[Camera] Buffer size: {buffer_size}')
 
         except Exception as e:
             self.get_logger().warn(f'[Camera] Could not read camera info: {e}')
 
     def _capture_frame(self):
-        """Capture a frame from the camera"""
+        """Capture a fresh frame from the camera"""
         with self.camera_lock:
             if not self.camera_connected or self.camera is None:
                 return None
 
             try:
+                # Flush any stale frames from the buffer to ensure we get the latest
+                for _ in range(3):  # Flush up to 3 old frames
+                    self.camera.grab()
+                
+                # Capture the actual frame we want
                 ret, frame = self.camera.read()
                 if not ret or frame is None:
                     self.get_logger().warn('[Camera] Failed to capture frame')
@@ -206,6 +231,8 @@ class CameraNode(Node):
                 
                 # Convert to PIL Image
                 pil_image = Image.fromarray(frame_rgb)
+                
+                self.get_logger().debug('[Camera] Fresh frame captured successfully')
                 return pil_image
 
             except Exception as e:
@@ -225,19 +252,22 @@ class CameraNode(Node):
             os.makedirs(snap_dir, exist_ok=True)
             tmp_path = f'{actual_path}.tmp'
             
+            # Write to temporary file first
             with open(tmp_path, 'wb') as f:
                 f.write(image_bytes)
                 f.flush()
-                os.fsync(f.fileno())
+                os.fsync(f.fileno())  # Ensure data is written to disk
+            
+            # Atomic replace to avoid race conditions
             os.replace(tmp_path, actual_path)  # atomic on POSIX
             
-            self.get_logger().debug(f'[Camera] Snapshot saved: {actual_path}')
+            self.get_logger().debug(f'[Camera] Snapshot saved atomically: {actual_path}')
             
         except Exception as e:
             self.get_logger().error(f'[Camera] Failed to write snapshot: {e}')
 
     def capture_and_publish_frame(self):
-        """Capture and publish a single frame"""
+        """Capture and publish a single frame with proper ordering"""
         try:
             # Skip if pipeline is busy
             if self.pipeline_state == "processing":
@@ -249,7 +279,7 @@ class CameraNode(Node):
                 self.get_logger().warn('[Camera] Camera not connected')
                 return
 
-            # Capture frame
+            # Capture fresh frame
             frame = self._capture_frame()
             if frame is None:
                 self.get_logger().warn('[Camera] No frame captured')
@@ -279,19 +309,25 @@ class CameraNode(Node):
                     self.get_logger().error(f'[Camera] Both JPEG and PNG encoding failed: {png_error}')
                     return
 
-            # Write snapshot for backend FIRST (ensure image is saved)
+            # CRITICAL: Save to file FIRST before publishing
+            # This ensures the file is written before the classifier processes it
             self._write_snapshot_atomic(image_bytes, format_type)
             self.get_logger().info(f'[Camera] Image saved to /shared/current_frame.{format_type.lower()}')
 
-            # Publish on ROS2 pipeline topic
+            # Small delay to ensure file is fully written and visible to other processes
+            time.sleep(0.1)  # 100ms delay
+
+            # Create ROS2 message with the SAME image data
             msg = CompressedImage()
             msg.format = 'jpeg' if format_type == 'JPEG' else 'png'
-            msg.data = image_bytes
+            msg.data = image_bytes  # Use the same bytes that were saved to file
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = 'camera_frame'
+
+            # Publish to ROS2 topic
             self.publisher.publish(msg)
 
-            self.get_logger().info('[Camera] Frame Captured → published to /pipeline/image_raw')
+            self.get_logger().info('[Camera] Frame Captured → saved to file → published to /pipeline/image_raw')
 
         except Exception as e:
             self.get_logger().error(f'[Camera] Failed to capture and publish frame: {e}')

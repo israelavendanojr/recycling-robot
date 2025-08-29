@@ -330,10 +330,24 @@ class ClassifierNode(Node):
             return None, 0.0
 
     def _get_image_hash(self, compressed_image_msg):
-        """Generate a simple hash for the image to detect duplicates"""
+        """Generate a more robust hash for the image to detect duplicates and ensure freshness"""
         try:
-            # Use timestamp and data length as a simple hash
-            return f"{compressed_image_msg.header.stamp.sec}_{compressed_image_msg.header.stamp.nanosec}_{len(compressed_image_msg.data)}"
+            # Use timestamp, data length, and first/last few bytes for better uniqueness
+            data = compressed_image_msg.data
+            data_length = len(data)
+            first_bytes = data[:10] if data_length >= 10 else data
+            last_bytes = data[-10:] if data_length >= 10 else data
+            
+            # Create hash from timestamp, length, and content
+            hash_parts = [
+                str(compressed_image_msg.header.stamp.sec),
+                str(compressed_image_msg.header.stamp.nanosec),
+                str(data_length),
+                str(first_bytes.hex()[:16]),  # First 8 bytes as hex
+                str(last_bytes.hex()[:16])    # Last 8 bytes as hex
+            ]
+            
+            return "_".join(hash_parts)
         except Exception:
             # Fallback to data length only
             return str(len(compressed_image_msg.data))
@@ -360,7 +374,10 @@ class ClassifierNode(Node):
             self.latest_image = msg
             self.last_processed_image_hash = image_hash
             
-            self.get_logger().info('[Classifier] New image received, processing immediately')
+            # Log frame details for debugging
+            frame_size = len(msg.data)
+            timestamp = f"{msg.header.stamp.sec}.{msg.header.stamp.nanosec:09d}"
+            self.get_logger().info(f'[Classifier] New image received: {frame_size} bytes, timestamp: {timestamp}, processing immediately')
             
             # In manual mode, process the image immediately
             if self.interval == 0.0:
@@ -369,12 +386,52 @@ class ClassifierNode(Node):
         except Exception as e:
             self.get_logger().error(f'[Classifier] Image callback error: {e}')
 
+    def _verify_saved_image(self, image_msg):
+        """Verify that the saved image file matches the processed frame"""
+        try:
+            # Check if the saved image file exists and has the expected size
+            jpg_path = '/shared/current_frame.jpg'
+            png_path = '/shared/current_frame.png'
+            
+            saved_path = None
+            if os.path.exists(jpg_path):
+                saved_path = jpg_path
+            elif os.path.exists(png_path):
+                saved_path = png_path
+            
+            if saved_path:
+                file_size = os.path.getsize(saved_path)
+                msg_size = len(image_msg.data)
+                
+                # Log file verification details
+                self.get_logger().debug(f'[Classifier] File verification: saved={file_size} bytes, message={msg_size} bytes')
+                
+                # Basic size validation (should be close, allowing for compression differences)
+                if abs(file_size - msg_size) < 1000:  # Allow 1KB difference for compression
+                    self.get_logger().debug('[Classifier] Saved image file matches processed frame')
+                    return True
+                else:
+                    self.get_logger().warn(f'[Classifier] Image file size mismatch: saved={file_size}, message={msg_size}')
+                    return False
+            else:
+                self.get_logger().warn('[Classifier] No saved image file found for verification')
+                return False
+                
+        except Exception as e:
+            self.get_logger().warn(f'[Classifier] Image verification failed: {e}')
+            return False
+
     def _process_image(self, image_msg):
         """Process a single image for classification"""
         try:
             # Skip if pipeline is busy
             if self.pipeline_state == "processing":
                 self.get_logger().info('[Classifier] Pipeline busy, skipping classification')
+                return
+            
+            # Verify the saved image matches the processed frame
+            if not self._verify_saved_image(image_msg):
+                self.get_logger().warn('[Classifier] Image verification failed, skipping classification')
                 return
             
             # Preprocess image
