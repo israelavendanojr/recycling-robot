@@ -163,3 +163,10 @@ export async function captureFrame(signal?: AbortSignal): Promise<{ status: stri
   devLog('POST /api/capture ->', data)
   return data
 }
+
+// Quit pipeline
+export async function quitPipeline(signal?: AbortSignal): Promise<{ status: string; message: string }> {
+  const { data } = await http.post('/api/quit', {}, { signal })
+  devLog('POST /api/quit ->', data)
+  return data
+}

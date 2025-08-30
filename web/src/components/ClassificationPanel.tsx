@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useClassifications } from '../hooks/useClassifications'
-import { getCurrentFrameURL, captureFrame } from '../api/client'
+import { getCurrentFrameURL, captureFrame, quitPipeline } from '../api/client'
 import { COLORS } from '../theme/tokens'
 import { ErrorBanner } from './ErrorBanner'
 
@@ -48,6 +48,9 @@ export const ClassificationPanel: React.FC = () => {
   const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null)
   const [captureLoading, setCaptureLoading] = useState(false)
   const [captureError, setCaptureError] = useState<string | null>(null)
+  const [quitLoading, setQuitLoading] = useState(false)
+  const [quitError, setQuitError] = useState<string | null>(null)
+  const [isShuttingDown, setIsShuttingDown] = useState(false)
 
   const imageUrl = useMemo(() => {
     const url = currentImage ? getCurrentFrameURL(currentImage.ts) : null
@@ -77,6 +80,26 @@ export const ClassificationPanel: React.FC = () => {
       setCaptureError(error instanceof Error ? error.message : 'Network error')
     } finally {
       setCaptureLoading(false)
+    }
+  }
+
+  const handleQuit = async () => {
+    setQuitLoading(true)
+    setQuitError(null)
+    
+    try {
+      const result = await quitPipeline()
+      if (result.status === 'ok') {
+        setIsShuttingDown(true)
+        // Show success message and disable all controls
+      } else {
+        setQuitError(result.message || 'Quit failed')
+      }
+    } catch (error) {
+      console.error('Quit error:', error)
+      setQuitError(error instanceof Error ? error.message : 'Network error')
+    } finally {
+      setQuitLoading(false)
     }
   }
 
@@ -204,8 +227,9 @@ export const ClassificationPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Capture Frame Button */}
+      {/* Control Buttons */}
       <div className="mt-6">
+        {/* Error Banners */}
         {captureError && (
           <ErrorBanner
             title="Capture Error"
@@ -213,21 +237,54 @@ export const ClassificationPanel: React.FC = () => {
             className="mb-4"
           />
         )}
-        
-        <button
-          onClick={handleCapture}
-          disabled={captureLoading}
-          className="w-full sm:w-auto mx-auto block px-6 py-3 bg-brand-teal-medium text-white rounded-lg shadow hover:bg-brand-teal-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {captureLoading ? (
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Capturing...
+        {quitError && (
+          <ErrorBanner
+            title="Quit Error"
+            error={quitError}
+            className="mb-4"
+          />
+        )}
+        {isShuttingDown && (
+          <div className="mb-4 p-3 bg-teal-50 text-teal-900 rounded-lg border border-teal-200">
+            <div className="text-center">
+              <div className="text-sm font-medium">Pipeline is shutting down...</div>
+              <div className="text-xs mt-1">Please wait while the system stops gracefully.</div>
             </div>
-          ) : (
-            'Capture Frame'
-          )}
-        </button>
+          </div>
+        )}
+        
+        {/* Button Row */}
+        <div className="flex gap-3">
+          <button
+            onClick={handleCapture}
+            disabled={captureLoading || isShuttingDown}
+            className="flex-1 px-4 py-2 bg-brand-teal-medium text-white rounded-lg shadow hover:bg-brand-teal-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {captureLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Capturing...
+              </div>
+            ) : (
+              'Capture Frame'
+            )}
+          </button>
+          
+          <button
+            onClick={handleQuit}
+            disabled={quitLoading || isShuttingDown}
+            className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg shadow hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {quitLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700 mr-2"></div>
+                Quitting...
+              </div>
+            ) : (
+              'Quit Pipeline'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

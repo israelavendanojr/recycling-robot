@@ -46,6 +46,64 @@ class CaptureHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 response = {"status": "error", "message": str(e)}
                 self.wfile.write(json.dumps(response).encode())
+                
+        elif self.path == '/shutdown':
+            try:
+                print("[CaptureServer] Received shutdown request")
+                
+                # Stop ROS2 processes gracefully (same as CLI cleanup)
+                print("[CaptureServer] Stopping launch process...")
+                
+                # Kill the launch process and all child processes
+                cmd1 = ["pkill", "-f", "robot.launch.py"]
+                result1 = subprocess.run(cmd1, capture_output=True, text=True, timeout=3)
+                
+                # Kill any remaining ros2 processes
+                cmd2 = ["pkill", "-f", "ros2"]
+                result2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=3)
+                
+                # More aggressive cleanup - kill by process group
+                cmd3 = ["pkill", "-9", "-f", "python3.*ros2"]
+                result3 = subprocess.run(cmd3, capture_output=True, text=True, timeout=2)
+                
+                # Kill any remaining python processes related to launch
+                cmd4 = ["pkill", "-f", "launch"]
+                result4 = subprocess.run(cmd4, capture_output=True, text=True, timeout=2)
+                
+                # Use launch kill result as primary for response
+                result = result1
+                
+                print(f"[CaptureServer] Launch kill: {result1.returncode}, ROS2 kill: {result2.returncode}")
+                print(f"[CaptureServer] Python kill: {result3.returncode}, Launch kill: {result4.returncode}")
+                
+                print(f"[CaptureServer] Shutdown command result: {result.returncode}")
+                if result.stdout:
+                    print(f"[CaptureServer] Stdout: {result.stdout}")
+                if result.stderr:
+                    print(f"[CaptureServer] Stderr: {result.stderr}")
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {"status": "ok", "message": "Shutdown triggered"}
+                self.wfile.write(json.dumps(response).encode())
+                
+                # Schedule server shutdown after responding
+                def shutdown_server():
+                    time.sleep(1)  # Give time for response to be sent
+                    print("[CaptureServer] Shutting down HTTP server...")
+                    import os
+                    os._exit(0)
+                
+                threading.Thread(target=shutdown_server, daemon=True).start()
+                    
+            except Exception as e:
+                print(f"[CaptureServer] Error handling shutdown request: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {"status": "error", "message": str(e)}
+                self.wfile.write(json.dumps(response).encode())
         else:
             self.send_response(404)
             self.end_headers()

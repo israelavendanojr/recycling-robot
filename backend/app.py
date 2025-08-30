@@ -598,6 +598,62 @@ def capture_frame():
         print(f"[Backend] Error in capture endpoint: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def trigger_pipeline_shutdown():
+    """Trigger pipeline shutdown via ROS2 container HTTP API"""
+    try:
+        print("[Backend] Triggering pipeline shutdown...")
+        
+        # Send shutdown request to ROS2 capture server
+        shutdown_url = "http://ros2:8001/shutdown"
+        
+        response = requests.post(shutdown_url, timeout=10)
+        
+        if response.status_code == 200:
+            print("[Backend] ROS2 shutdown triggered successfully")
+            return True
+        else:
+            print(f"[Backend] ROS2 shutdown server returned status {response.status_code}")
+            return False
+        
+    except requests.exceptions.ConnectionError as e:
+        # Connection error is expected when server shuts down immediately after responding
+        print(f"[Backend] Connection reset by shutdown server (expected): {e}")
+        print("[Backend] Assuming shutdown was successful")
+        return True
+    except requests.exceptions.Timeout as e:
+        print(f"[Backend] Timeout connecting to ROS2 shutdown server: {e}")
+        return False
+    except Exception as e:
+        print(f"[Backend] Error during pipeline shutdown: {e}")
+        import traceback
+        print(f"[Backend] Traceback: {traceback.format_exc()}")
+        return False
+
+@app.route("/api/quit", methods=["POST"])
+def quit_pipeline():
+    """Quit the pipeline gracefully - same as CLI 'q' command"""
+    try:
+        print("[Backend] Quit pipeline requested")
+        success = trigger_pipeline_shutdown()
+        
+        if success:
+            # Schedule Flask shutdown after responding
+            def shutdown_flask():
+                time.sleep(1)  # Give time for response to be sent
+                print("[Backend] Shutting down Flask server...")
+                import os
+                os._exit(0)
+            
+            threading.Thread(target=shutdown_flask, daemon=True).start()
+            
+            return jsonify({"status": "ok", "message": "Pipeline shutting down"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to shutdown pipeline"}), 500
+            
+    except Exception as e:
+        print(f"[Backend] Error in quit endpoint: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Serve React app
 @app.route('/')
 def serve_app():
