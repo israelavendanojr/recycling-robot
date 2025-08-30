@@ -11,7 +11,7 @@ export interface Classification {
   timestamp: number;
   label: string;
   confidence: number;
-  raw_logits?: string;
+  raw_logits?: string | null;
   image_source: string;
   created_at: string;
 }

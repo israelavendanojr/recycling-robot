@@ -50,12 +50,18 @@ export const ConfidenceChart: React.FC = () => {
   const recentClassifications = useRecentClassifications(100)
 
   const chartData: ChartDataPoint[] = React.useMemo(() => {
-    return recentClassifications.map(classification => ({
-      timestamp: classification.timestamp,
-      confidence: classification.confidence,
-      label: classification.label,
-      time: format(new Date(classification.timestamp * 1000), 'HH:mm'),
-    }))
+    if (!recentClassifications || recentClassifications.length === 0) {
+      return []
+    }
+    
+    return recentClassifications
+      .filter(classification => classification && typeof classification.confidence === 'number')
+      .map(classification => ({
+        timestamp: classification.timestamp,
+        confidence: classification.confidence,
+        label: classification.label,
+        time: format(new Date(classification.timestamp * 1000), 'HH:mm'),
+      }))
   }, [recentClassifications])
 
   if (chartData.length === 0) {
@@ -64,8 +70,11 @@ export const ConfidenceChart: React.FC = () => {
         <div className="text-lg font-semibold text-brand-text-primary mb-6">
           Confidence Trends
         </div>
-        <div className="h-64 flex items-center justify-center text-brand-text-secondary">
-          No classification data available
+        <div className="h-64 flex items-center justify-center text-brand-text-secondary" role="status">
+          <div className="text-center">
+            <div className="text-lg mb-2">No confidence data available</div>
+            <div className="text-sm">Charts will appear after classifications are recorded</div>
+          </div>
         </div>
       </div>
     )

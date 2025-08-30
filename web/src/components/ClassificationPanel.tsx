@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useClassifications } from '../hooks/useClassifications'
 import { getCurrentFrameURL } from '../api/client'
 import { COLORS } from '../theme/tokens'
+import { ErrorBanner } from './ErrorBanner'
 
 const DonutChart: React.FC<{ confidence: number }> = ({ confidence }) => {
   const data = [
@@ -43,10 +44,17 @@ const DonutChart: React.FC<{ confidence: number }> = ({ confidence }) => {
 
 export const ClassificationPanel: React.FC = () => {
   const { latest, currentImage, loading, error } = useClassifications()
+  const [imageError, setImageError] = useState(false)
+  const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null)
 
   const imageUrl = useMemo(() => {
-    return currentImage ? getCurrentFrameURL(currentImage.ts) : null
-  }, [currentImage])
+    const url = currentImage ? getCurrentFrameURL(currentImage.ts) : null
+    if (url && url !== previousImageUrl) {
+      setPreviousImageUrl(url)
+      setImageError(false)
+    }
+    return url
+  }, [currentImage, previousImageUrl])
 
   if (loading) {
     return (
@@ -71,21 +79,23 @@ export const ClassificationPanel: React.FC = () => {
 
   if (error) {
     return (
-      <div className="card bg-red-50 border-red-200">
-        <div className="text-red-600 font-medium">Classification Error</div>
-        <div className="text-red-500 text-sm mt-1">{error}</div>
-      </div>
+      <ErrorBanner
+        title="Classification Error"
+        error={error}
+        className="mb-6"
+      />
     )
   }
 
-  if (!latest || !currentImage) {
+  if (!latest && !currentImage) {
     return (
       <div className="card">
         <div className="text-lg font-semibold text-brand-text-primary mb-6">
           Current Classification
         </div>
-        <div className="text-center text-brand-text-secondary py-8">
-          No classifications available
+        <div className="text-center text-brand-text-secondary py-8" role="status">
+          <div className="text-lg mb-2">No classification data available</div>
+          <div className="text-sm">Waiting for the first classification...</div>
         </div>
       </div>
     )
@@ -99,14 +109,23 @@ export const ClassificationPanel: React.FC = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Image */}
-        <div className="border border-brand-border rounded-lg overflow-hidden">
+        <div className="border border-brand-border rounded-lg overflow-hidden relative">
           {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt="Current classification frame"
-              className="w-full h-auto aspect-video object-cover"
-              key={currentImage.ts} // Force re-render when timestamp changes
-            />
+            <>
+              <img
+                src={imageUrl}
+                alt="Current classification frame"
+                className="w-full h-auto aspect-video object-cover"
+                key={currentImage?.ts} // Force re-render when timestamp changes
+                onError={() => setImageError(true)}
+                onLoad={() => setImageError(false)}
+              />
+              {imageError && (
+                <div className="absolute top-2 left-2 bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                  Image stale
+                </div>
+              )}
+            </>
           ) : (
             <div className="aspect-video bg-gray-100 flex items-center justify-center">
               <span className="text-brand-text-secondary">No image available</span>
@@ -116,39 +135,48 @@ export const ClassificationPanel: React.FC = () => {
 
         {/* Classification Details */}
         <div className="space-y-4">
-          {/* Label */}
-          <div className="text-center">
-            <div className="text-3xl font-bold text-brand-text-primary uppercase tracking-wider">
-              {latest.label}
-            </div>
-          </div>
+          {latest ? (
+            <>
+              {/* Label */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-brand-text-primary uppercase tracking-wider">
+                  {latest.label}
+                </div>
+              </div>
 
-          {/* Confidence */}
-          <div className="text-center">
-            <div className="text-4xl font-bold text-brand-teal-medium mb-2">
-              {(latest.confidence * 100).toFixed(1)}%
-            </div>
-            <div className="text-sm text-brand-text-label">Confidence</div>
-          </div>
+              {/* Confidence */}
+              <div className="text-center">
+                <div className="text-4xl font-bold text-brand-teal-medium mb-2">
+                  {(latest.confidence * 100).toFixed(1)}%
+                </div>
+                <div className="text-sm text-brand-text-label">Confidence</div>
+              </div>
 
-          {/* Donut Chart */}
-          <div className="flex justify-center">
-            <DonutChart confidence={latest.confidence * 100} />
-          </div>
+              {/* Donut Chart */}
+              <div className="flex justify-center">
+                <DonutChart confidence={latest.confidence * 100} />
+              </div>
 
-          {/* Metadata */}
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-brand-text-label">Timestamp:</span>
-              <span className="text-brand-text-primary">
-                {format(new Date(latest.timestamp * 1000), 'HH:mm:ss')}
-              </span>
+              {/* Metadata */}
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-brand-text-label">Timestamp:</span>
+                  <span className="text-brand-text-primary">
+                    {format(new Date(latest.timestamp * 1000), 'HH:mm:ss')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-brand-text-label">Source:</span>
+                  <span className="text-brand-text-primary">{latest.image_source}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center text-brand-text-secondary py-8">
+              <div className="text-lg mb-2">No classification yet</div>
+              <div className="text-sm">Waiting for the first classification...</div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-brand-text-label">Source:</span>
-              <span className="text-brand-text-primary">{latest.image_source}</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'
 import { getCounters } from '../api/client'
 import { useRealTime } from '../hooks/useRealTime'
+import { ErrorBanner } from './ErrorBanner'
 import type { MaterialCounts } from '../types'
 import { BAR_PALETTE, AXIS_TICK } from '../theme/charts'
 
@@ -100,10 +101,10 @@ export const MaterialCounting: React.FC = () => {
 
   if (error) {
     return (
-      <div className="card bg-red-50 border-red-200">
-        <div className="text-red-600 font-medium">Material Counting Error</div>
-        <div className="text-red-500 text-sm mt-1">{error}</div>
-      </div>
+      <ErrorBanner
+        title="Material Counting Error"
+        error={error}
+      />
     )
   }
 

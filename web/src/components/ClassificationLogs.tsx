@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import { useClassifications } from '../hooks/useClassifications'
+import { ErrorBanner } from './ErrorBanner'
 import type { Classification } from '../types'
 
 interface PaginationProps {
@@ -156,10 +157,10 @@ export const ClassificationLogs: React.FC = () => {
 
   if (error) {
     return (
-      <div className="card bg-red-50 border-red-200">
-        <div className="text-red-600 font-medium">Classification Logs Error</div>
-        <div className="text-red-500 text-sm mt-1">{error}</div>
-      </div>
+      <ErrorBanner
+        title="Classification Logs Error"
+        error={error}
+      />
     )
   }
 

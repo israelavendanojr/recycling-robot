@@ -4,11 +4,10 @@ import { ClassificationPanel } from './ClassificationPanel'
 import { MaterialCounting } from './MaterialCounting'
 import { ConfidenceChart } from './ConfidenceChart'
 import { ClassificationLogs } from './ClassificationLogs'
-import { GAP } from '../theme/tokens'
 
 export const Dashboard: React.FC = () => {
   return (
-    <div className={`min-h-screen bg-brand-bg-primary p-6 gap-${GAP}`}>
+    <div className="min-h-screen bg-brand-bg-primary p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center py-8">

@@ -1,6 +1,7 @@
 import React from 'react'
 import { format } from 'date-fns'
 import { useSystemHealth } from '../hooks/useSystemHealth'
+import { ErrorBanner } from './ErrorBanner'
 
 const ServiceIndicator: React.FC<{ name: string; status: boolean }> = ({ name, status }) => (
   <div className="flex items-center space-x-2">
@@ -56,10 +57,10 @@ export const SystemStatus: React.FC = () => {
 
   if (error) {
     return (
-      <div className="card bg-red-50 border-red-200">
-        <div className="text-red-600 font-medium">System Status Error</div>
-        <div className="text-red-500 text-sm mt-1">{error}</div>
-      </div>
+      <ErrorBanner
+        title="System Status Error"
+        error={error}
+      />
     )
   }
 
