@@ -1,193 +1,131 @@
-import { API_BASE } from '../config';
+import axios, { AxiosResponse } from 'axios'
+import { z } from 'zod'
+import type { SystemHealth, Classification, MaterialCounts, CurrentImageInfo } from '../types'
 
-export type ClassificationEvent = {
-  id: number;
-  class: string;
-  confidence: number;
-  timestamp: number;
-  raw_logits?: string;
-  image_source?: string;
-  created_at?: string;
-};
-
-export async function fetchEvents(signal?: AbortSignal): Promise<ClassificationEvent[]> {
-  console.log('[API] Fetching events from:', `${API_BASE}/api/classifications`);
+// Base URL configuration
+const getBaseURL = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  if (envUrl) return envUrl
   
-  try {
-    const res = await fetch(`${API_BASE}/api/classifications`, { signal });
-    if (!res.ok) {
-      throw new Error(`Failed to fetch events: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    console.log('[API] Received classifications response:', data);
-    
-    if (data.success && data.classifications) {
-      // Transform the data to match the expected format
-      const events = data.classifications.map((item: any) => ({
-        id: item.id,
-        class: item.label,
-        confidence: item.confidence,
-        timestamp: new Date(item.timestamp).getTime() / 1000, // Convert to Unix timestamp
-        raw_logits: item.raw_logits,
-        image_source: item.image_source,
-        created_at: item.created_at
-      }));
+  // Auto-detect based on current location
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    return isLocalhost ? 'http://localhost:8000' : 'http://backend:8000'
+  }
+  
+  return 'http://backend:8000'
+}
+
+// Create axios instance
+const api = axios.create({
+  baseURL: getBaseURL(),
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Retry utility
+const withRetry = async <T>(
+  fn: () => Promise<AxiosResponse<T>>,
+  maxRetries = 2,
+  delay = 1000
+): Promise<T> => {
+  let lastError: Error
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fn()
+      return response.data
+    } catch (error) {
+      lastError = error as Error
       
-      console.log(`[API] Successfully fetched ${events.length} classifications`);
-      return events;
-    } else if (data.classifications) {
-      // Handle case where success field might be missing
-      const events = data.classifications.map((item: any) => ({
-        id: item.id,
-        class: item.label,
-        confidence: item.confidence,
-        timestamp: new Date(item.timestamp).getTime() / 1000,
-        raw_logits: item.raw_logits,
-        image_source: item.image_source,
-        created_at: item.created_at
-      }));
-      
-      console.log(`[API] Successfully fetched ${events.length} classifications (no success field)`);
-      return events;
-    } else {
-      console.warn('[API] Unexpected response format:', data);
-      return [];
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)))
+      }
     }
-  } catch (e) {
-    console.error('[API] Failed to fetch events:', e);
-    throw e;
   }
+
+  throw lastError!
 }
 
-export async function fetchCounters(signal?: AbortSignal): Promise<Record<string, number>> {
-  console.log('[API] Fetching counters from:', `${API_BASE}/api/counters`);
-  
-  try {
-    const res = await fetch(`${API_BASE}/api/counters`, { signal });
-    if (!res.ok) throw new Error(`Failed to fetch counters: ${res.status}`);
-    
-    const data = await res.json();
-    console.log('[API] Received counters:', data);
-    return data;
-  } catch (e) {
-    console.error('[API] Failed to fetch counters:', e);
-    throw e;
-  }
+// Zod schemas for runtime validation
+const SystemHealthSchema = z.object({
+  status: z.enum(['ok', 'error']),
+  services: z.object({
+    ros2: z.boolean(),
+    camera: z.boolean(),
+    db: z.boolean(),
+  }),
+  system: z.object({
+    cpu_percent: z.number(),
+    memory_percent: z.number(),
+    disk_usage: z.number(),
+    uptime: z.number(),
+  }),
+  timestamp: z.number(),
+  classifier_running: z.boolean(),
+})
+
+const ClassificationSchema = z.object({
+  id: z.number(),
+  timestamp: z.number(),
+  label: z.string(),
+  confidence: z.number(),
+  raw_logits: z.string().optional(),
+  image_source: z.string(),
+  created_at: z.string(),
+})
+
+const MaterialCountsSchema = z.object({
+  cardboard: z.number(),
+  glass: z.number(),
+  metal: z.number(),
+  plastic: z.number(),
+  trash: z.number(),
+})
+
+const CurrentImageInfoSchema = z.object({
+  ts: z.number(),
+})
+
+// API functions
+export const getHealth = async (signal?: AbortSignal): Promise<SystemHealth> => {
+  return withRetry(() => api.get('/api/health', { signal }))
+    .then(data => SystemHealthSchema.parse(data))
 }
 
-export async function fetchHealth(signal?: AbortSignal): Promise<any> {
-  console.log('[API] Fetching health from:', `${API_BASE}/api/health`);
-  
-  try {
-    const res = await fetch(`${API_BASE}/api/health`, { signal });
-    if (!res.ok) throw new Error(`Failed to fetch health: ${res.status}`);
-    
-    const data = await res.json();
-    console.log('[API] Received health status:', data);
-    return data;
-  } catch (e) {
-    console.error('[API] Failed to fetch health:', e);
-    throw e;
-  }
+export const getClassifications = async (signal?: AbortSignal): Promise<Classification[]> => {
+  return withRetry(() => api.get('/api/classifications', { signal }))
+    .then(data => z.array(ClassificationSchema).parse(data))
 }
 
-export async function fetchLatestClassification(signal?: AbortSignal): Promise<ClassificationEvent | null> {
-  console.log('[API] Fetching latest classification from:', `${API_BASE}/api/classifications/latest`);
-  
+export const getLatestClassification = async (signal?: AbortSignal): Promise<Classification | null> => {
   try {
-    const res = await fetch(`${API_BASE}/api/classifications/latest`, { signal });
-    if (!res.ok) {
-      throw new Error(`Failed to fetch latest classification: ${res.status} ${res.statusText}`);
+    const data = await withRetry(() => api.get('/api/classifications/latest', { signal }))
+    return data ? ClassificationSchema.parse(data) : null
+  } catch (error) {
+    // Return null if no latest classification exists
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null
     }
-    
-    const data = await res.json();
-    console.log('[API] Received latest classification response:', data);
-    
-    if (data.success && data.classification) {
-      const item = data.classification;
-      const event = {
-        id: item.id,
-        class: item.label,
-        confidence: item.confidence,
-        timestamp: new Date(item.timestamp).getTime() / 1000,
-        raw_logits: item.raw_logits,
-        image_source: item.image_source,
-        created_at: item.created_at
-      };
-      
-      console.log('[API] Successfully fetched latest classification:', event);
-      return event;
-    } else {
-      console.warn('[API] No latest classification found or unexpected format:', data);
-      return null;
-    }
-  } catch (e) {
-    console.error('[API] Failed to fetch latest classification:', e);
-    return null;
+    throw error
   }
 }
 
-export async function fetchCurrentImage(signal?: AbortSignal): Promise<{ image_url: string; timestamp: number; source: string } | null> {
-  console.log('[API] Fetching current image info from:', `${API_BASE}/api/current_image`);
-  
-  try {
-    const res = await fetch(`${API_BASE}/api/current_image`, { signal });
-    if (!res.ok) {
-      throw new Error(`Failed to fetch current image: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    console.log('[API] Received current image response:', data);
-    
-    if (data.success && data.image_url) {
-      const imageInfo = {
-        image_url: `${API_BASE}${data.image_url}`,
-        timestamp: data.timestamp,
-        source: data.source
-      };
-      
-      console.log('[API] Successfully fetched current image info:', imageInfo);
-      return imageInfo;
-    } else {
-      console.warn('[API] No current image found or unexpected format:', data);
-      return null;
-    }
-  } catch (e) {
-    console.error('[API] Failed to fetch current image:', e);
-    return null;
-  }
+export const getCurrentImageInfo = async (signal?: AbortSignal): Promise<CurrentImageInfo> => {
+  return withRetry(() => api.get('/api/current_image', { signal }))
+    .then(data => CurrentImageInfoSchema.parse(data))
 }
 
-export async function startClassifier(): Promise<{ success: boolean; running: boolean }>{
-  console.log('[API] Starting classifier...');
-  
-  try {
-    const res = await fetch(`${API_BASE}/api/classifier/start`, { method: 'POST' });
-    if (!res.ok) throw new Error(`Failed to start classifier: ${res.status}`);
-    
-    const data = await res.json();
-    console.log('[API] Classifier start response:', data);
-    return data;
-  } catch (e) {
-    console.error('[API] Failed to start classifier:', e);
-    throw e;
-  }
+export const getCounters = async (signal?: AbortSignal): Promise<MaterialCounts> => {
+  return withRetry(() => api.get('/api/counters', { signal }))
+    .then(data => MaterialCountsSchema.parse(data))
 }
 
-export async function stopClassifier(): Promise<{ success: boolean; running: boolean }>{
-  console.log('[API] Stopping classifier...');
-  
-  try {
-    const res = await fetch(`${API_BASE}/api/classifier/stop`, { method: 'POST' });
-    if (!res.ok) throw new Error(`Failed to stop classifier: ${res.status}`);
-    
-    const data = await res.json();
-    console.log('[API] Classifier stop response:', data);
-    return data;
-  } catch (e) {
-    console.error('[API] Failed to stop classifier:', e);
-    throw e;
-  }
+// Utility to get current frame URL with timestamp
+export const getCurrentFrameURL = (ts: number): string => {
+  return `${getBaseURL()}/api/current_frame.jpg?ts=${ts}`
 }
 
+export default api

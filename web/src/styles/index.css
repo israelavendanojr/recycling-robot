@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  body {
+    @apply bg-brand-bg-primary text-brand-text-primary;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-brand-card rounded-lg shadow-sm p-6 border border-brand-border;
+  }
+  
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-teal-medium focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply btn bg-brand-teal-medium text-white hover:bg-brand-teal-dark-bar;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-gray-100 text-brand-text-primary hover:bg-gray-200;
+  }
+}

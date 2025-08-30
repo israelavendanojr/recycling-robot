@@ -1,7 +1,8 @@
-import Dashboard from './components/Dashboard'
+import React from 'react'
+import { Dashboard } from './components/Dashboard'
+import './styles/index.css'
 
-function App() {
-  console.log('🚀 Frontend App component loaded at:', new Date().toISOString());
+const App: React.FC = () => {
   return <Dashboard />
 }
 
