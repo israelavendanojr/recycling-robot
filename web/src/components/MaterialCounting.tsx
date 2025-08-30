@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'
 import { getCounters } from '../api/client'
-import { useRealTime } from '../hooks/useRealTime'
 import { ErrorBanner } from './ErrorBanner'
 import type { MaterialCounts } from '../types'
 import { BAR_PALETTE, AXIS_TICK } from '../theme/charts'
@@ -28,27 +27,13 @@ const CustomLegend: React.FC<{ data: MaterialCountData[] }> = ({ data }) => (
   </div>
 )
 
-const CustomBarLabel: React.FC<{ 
-  x?: number; 
-  y?: number; 
-  width?: number; 
-  value?: number;
-}> = ({ x = 0, y = 0, width = 0, value = 0 }) => (
-  <text
-    x={x + width + 8}
-    y={y + 12}
-    fill={AXIS_TICK}
-    fontSize={12}
-    fontWeight="500"
-  >
-    {value}
-  </text>
-)
+
 
 export const MaterialCounting: React.FC = () => {
   const [counts, setCounts] = useState<MaterialCounts | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchCounts = async () => {
     try {
@@ -64,12 +49,34 @@ export const MaterialCounting: React.FC = () => {
     }
   }
 
-  // Use real-time polling
-  useRealTime(fetchCounts)
+  // Start polling for material counts (slower since it changes less frequently)
+  const startPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+    }
+    
+    // Poll every 10 seconds for material counts
+    pollIntervalRef.current = setInterval(fetchCounts, 10000)
+  }
 
-  // Initial fetch
+  // Stop polling
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }
+
+  // Initial fetch and start polling
   useEffect(() => {
-    fetchCounts()
+    fetchCounts().then(() => {
+      startPolling()
+    })
+
+    // Cleanup on unmount
+    return () => {
+      stopPolling()
+    }
   }, [])
 
   const chartData: MaterialCountData[] = React.useMemo(() => {
@@ -126,27 +133,28 @@ export const MaterialCounting: React.FC = () => {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
-            layout="horizontal"
-            margin={{ top: 20, right: 60, left: 80, bottom: 5 }}
+            margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
           >
-            <XAxis 
+            {/* Materials along bottom */}
+            <XAxis
+              dataKey="material"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 12, fill: AXIS_TICK }}
+            />
+
+            {/* Counts up the side */}
+            <YAxis
               type="number"
               axisLine={false}
               tickLine={false}
               tick={{ fontSize: 12, fill: AXIS_TICK }}
             />
-            <YAxis 
-              type="category"
-              dataKey="material"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 12, fill: AXIS_TICK }}
-              width={70}
-            />
-            <Bar 
-              dataKey="count" 
-              radius={[0, 4, 4, 0]}
-              label={<CustomBarLabel />}
+
+            <Bar
+              dataKey="count"
+              radius={[4, 4, 0, 0]} // rounded top corners
+              label={{ position: 'top', fill: AXIS_TICK, fontSize: 12, fontWeight: 500 }}
             >
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -155,6 +163,7 @@ export const MaterialCounting: React.FC = () => {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
 
       <CustomLegend data={chartData} />
     </div>

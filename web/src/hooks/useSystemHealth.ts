@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getHealth } from '../api/client'
 import type { SystemHealth } from '../types'
-import { useRealTime } from './useRealTime'
 
 interface UseSystemHealthReturn {
   health: SystemHealth | null
@@ -16,6 +15,7 @@ export const useSystemHealth = (): UseSystemHealthReturn => {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchHealth = async () => {
     try {
@@ -39,15 +39,33 @@ export const useSystemHealth = (): UseSystemHealthReturn => {
     }
   }
 
-  // Use real-time hook for polling
-  useRealTime(fetchHealth)
+  // Start polling for system health (less frequent since it's just status)
+  const startPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+    }
+    
+    // Poll every 5 seconds for system health
+    pollIntervalRef.current = setInterval(fetchHealth, 5000)
+  }
 
-  // Initial fetch
+  // Stop polling
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }
+
+  // Initial fetch and start polling
   useEffect(() => {
-    fetchHealth()
+    fetchHealth().then(() => {
+      startPolling()
+    })
 
     // Cleanup on unmount
     return () => {
+      stopPolling()
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
