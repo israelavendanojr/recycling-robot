@@ -109,7 +109,7 @@ export const ClassificationLogs: React.FC = () => {
   const { classifications, loading, error } = useClassifications()
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(10)
 
   // Filter and sort classifications
   const filteredClassifications = useMemo(() => {

@@ -1,6 +1,6 @@
 export interface SystemHealth {
   status: 'ok' | 'error';
-  services: { ros2: boolean; camera: boolean; db: boolean; };
+  services: { ros2: boolean; camera: boolean; db: boolean; api?: boolean; };
   system: { cpu_percent: number; memory_percent: number; disk_usage: number; uptime: number; };
   timestamp: number;
   classifier_running: boolean;

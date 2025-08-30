@@ -27,12 +27,33 @@ export const useSystemHealth = (): UseSystemHealthReturn => {
       abortControllerRef.current = new AbortController()
       
       const healthData = await getHealth(abortControllerRef.current.signal)
-      setHealth(healthData)
+      
+      // Inject API status based on whether the health request succeeded
+      const enhancedHealthData = {
+        ...healthData,
+        services: {
+          ...healthData.services,
+          api: true // If we got here, the API request succeeded
+        }
+      }
+      
+      setHealth(enhancedHealthData)
       setError(null)
       setLastUpdate(new Date())
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
         setError(err.message)
+        
+        // If we have previous health data, update just the API status to false
+        if (health) {
+          setHealth({
+            ...health,
+            services: {
+              ...health.services,
+              api: false
+            }
+          })
+        }
       }
     } finally {
       setLoading(false)

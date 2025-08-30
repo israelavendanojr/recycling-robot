@@ -4,6 +4,7 @@ import { ClassificationPanel } from './ClassificationPanel'
 import { MaterialCounting } from './MaterialCounting'
 import { ConfidenceChart } from './ConfidenceChart'
 import { ClassificationLogs } from './ClassificationLogs'
+import { SystemMetrics } from './SystemMetrics'
 
 export const Dashboard: React.FC = () => {
   return (
@@ -38,6 +39,9 @@ export const Dashboard: React.FC = () => {
 
         {/* Logs */}
         <ClassificationLogs />
+
+        {/* System Metrics */}
+        <SystemMetrics />
       </div>
     </div>
   )

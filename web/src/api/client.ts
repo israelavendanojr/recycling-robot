@@ -16,6 +16,7 @@ const SystemHealthSchema: z.ZodType<SystemHealth> = z.object({
     ros2: z.boolean(),
     camera: z.boolean(),
     db: z.boolean(),
+    api: z.boolean().optional(),
   }),
   system: z.object({
     cpu_percent: z.number(),
