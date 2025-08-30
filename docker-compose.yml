@@ -29,6 +29,8 @@ services:
       - /dev:/dev
       - /sys/class/gpio:/sys/class/gpio
       - /sys/devices:/sys/devices
+    ports:
+      - "8001:8001"  # Expose capture server port
     privileged: true
     networks:
       - robot_network

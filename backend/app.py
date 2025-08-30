@@ -554,6 +554,50 @@ def classifier_stop():
     classifier_running = False
     return jsonify({'success': True, 'running': classifier_running})
 
+def trigger_manual_capture():
+    """Trigger manual capture via HTTP request to ROS2 container"""
+    try:
+        # Since the backend runs in a container, we'll make an HTTP request to a simple
+        # HTTP server running in the ROS2 container that will trigger the capture
+        ros2_capture_url = "http://ros2:8001/trigger_capture"
+        
+        print(f"[Backend] Sending capture request to {ros2_capture_url}")
+        
+        response = requests.post(ros2_capture_url, timeout=10)
+        
+        if response.status_code == 200:
+            print("[Backend] Capture triggered successfully via ROS2 HTTP server")
+            return True
+        else:
+            print(f"[Backend] ROS2 capture server returned status {response.status_code}")
+            return False
+        
+    except requests.exceptions.ConnectionError as e:
+        print(f"[Backend] Could not connect to ROS2 capture server: {e}")
+        print("[Backend] Note: ROS2 HTTP capture server may not be running")
+        return False
+    except requests.exceptions.Timeout as e:
+        print(f"[Backend] Timeout connecting to ROS2 capture server: {e}")
+        return False
+    except Exception as e:
+        print(f"[Backend] Error triggering capture via HTTP: {e}")
+        import traceback
+        print(f"[Backend] Traceback: {traceback.format_exc()}")
+        return False
+
+@app.route("/api/capture", methods=["POST"])
+def capture_frame():
+    """Trigger a manual frame capture via ROS2 camera node"""
+    try:
+        success = trigger_manual_capture()
+        if success:
+            return jsonify({"status": "ok", "message": "Capture triggered successfully"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to trigger capture"}), 500
+    except Exception as e:
+        print(f"[Backend] Error in capture endpoint: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Serve React app
 @app.route('/')
 def serve_app():

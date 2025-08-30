@@ -156,3 +156,10 @@ export async function getCounters(signal?: AbortSignal): Promise<MaterialCounts>
 export const getCurrentFrameURL = (ts: number): string => {
   return `${baseURL}/api/current_frame.jpg?ts=${ts}`
 }
+
+// Manual frame capture
+export async function captureFrame(signal?: AbortSignal): Promise<{ status: string; message: string }> {
+  const { data } = await http.post('/api/capture', {}, { signal })
+  devLog('POST /api/capture ->', data)
+  return data
+}

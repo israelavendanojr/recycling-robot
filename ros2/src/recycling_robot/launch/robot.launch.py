@@ -93,6 +93,14 @@ def generate_launch_description():
                 'sorting_delay': 1.0
             }]
         ),
+
+        # --- Capture Server (HTTP trigger for dashboard) ---
+        Node(
+            package='recycling_robot',
+            executable='capture_server',
+            name='capture_server',
+            output='screen'
+        ),
         
         # Key input is handled by host-side key_listener.py
         # No key_input_node needed in ROS2 launch

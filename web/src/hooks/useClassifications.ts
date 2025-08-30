@@ -9,6 +9,7 @@ interface UseClassificationsReturn {
   loading: boolean
   error: string | null
   lastUpdate: Date | null
+  refetch: () => Promise<void>
 }
 
 export const useClassifications = (): UseClassificationsReturn => {
@@ -106,7 +107,7 @@ export const useClassifications = (): UseClassificationsReturn => {
     }
   }, [])
 
-  return { classifications, latest, currentImage, loading, error, lastUpdate }
+  return { classifications, latest, currentImage, loading, error, lastUpdate, refetch: fetchFullData }
 }
 
 // Hook for recent N classifications for charts

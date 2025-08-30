@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useClassifications } from '../hooks/useClassifications'
-import { getCurrentFrameURL } from '../api/client'
+import { getCurrentFrameURL, captureFrame } from '../api/client'
 import { COLORS } from '../theme/tokens'
 import { ErrorBanner } from './ErrorBanner'
 
@@ -43,9 +43,11 @@ const DonutChart: React.FC<{ confidence: number }> = ({ confidence }) => {
 }
 
 export const ClassificationPanel: React.FC = () => {
-  const { latest, currentImage, loading, error } = useClassifications()
+  const { latest, currentImage, loading, error, refetch } = useClassifications()
   const [imageError, setImageError] = useState(false)
   const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(null)
+  const [captureLoading, setCaptureLoading] = useState(false)
+  const [captureError, setCaptureError] = useState<string | null>(null)
 
   const imageUrl = useMemo(() => {
     const url = currentImage ? getCurrentFrameURL(currentImage.ts) : null
@@ -55,6 +57,28 @@ export const ClassificationPanel: React.FC = () => {
     }
     return url
   }, [currentImage, previousImageUrl])
+
+  const handleCapture = async () => {
+    setCaptureLoading(true)
+    setCaptureError(null)
+    
+    try {
+      const result = await captureFrame()
+      if (result.status === 'ok') {
+        // Wait a moment for the frame to be processed, then refresh
+        setTimeout(() => {
+          refetch()
+        }, 2000) // 2 second delay to allow processing
+      } else {
+        setCaptureError(result.message || 'Capture failed')
+      }
+    } catch (error) {
+      console.error('Capture error:', error)
+      setCaptureError(error instanceof Error ? error.message : 'Network error')
+    } finally {
+      setCaptureLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -178,6 +202,32 @@ export const ClassificationPanel: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Capture Frame Button */}
+      <div className="mt-6">
+        {captureError && (
+          <ErrorBanner
+            title="Capture Error"
+            error={captureError}
+            className="mb-4"
+          />
+        )}
+        
+        <button
+          onClick={handleCapture}
+          disabled={captureLoading}
+          className="w-full sm:w-auto mx-auto block px-6 py-3 bg-brand-teal-medium text-white rounded-lg shadow hover:bg-brand-teal-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {captureLoading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Capturing...
+            </div>
+          ) : (
+            'Capture Frame'
+          )}
+        </button>
       </div>
     </div>
   )
