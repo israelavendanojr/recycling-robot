@@ -12,22 +12,35 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 # Import the stepper controller (path matches your repo layout)
-from recycling_robot.utils.motor_controller import StepperMotorController as MotorController
+from recycling_robot.utils.stepper_motor_controller import StepperMotorController
 
 
 class SortingNode(Node):
     def __init__(self):
         super().__init__("sorting_node")
 
-        # Parameters
-        self.declare_parameter("sorting_delay", 0.5)    # small pause before actuation
-        self.declare_parameter("stepper_speed", 0.6)    # 0..1 fraction of MAX_SPEED_RPM
+        # ROS2 Parameters
+        self.declare_parameter("sorting_delay", 0.5)                    # pause before actuation
+        self.declare_parameter("stepper_speed_delay", 0.002)           # step delay (lower = faster)
+        self.declare_parameter("hold_position_after_sort", True)       # keep motor energized
+        self.declare_parameter("return_to_home_after_sort", False)     # return to 0° after sort
 
         self.sorting_delay = float(self.get_parameter("sorting_delay").value)
-        self.stepper_speed = float(self.get_parameter("stepper_speed").value)
+        self.stepper_speed_delay = float(self.get_parameter("stepper_speed_delay").value)
+        self.hold_position = bool(self.get_parameter("hold_position_after_sort").value)
+        self.return_to_home = bool(self.get_parameter("return_to_home_after_sort").value)
+
+        # Classification to angle mapping (4 bins, removed glass for safety)
+        self.bin_angles = {
+            "cardboard": 0,     # straight through (default)
+            "metal": 90,        # first bin
+            "plastic": 180,     # second bin  
+            "trash": 270,       # third bin
+            # Any unknown classification defaults to cardboard
+        }
 
         # Motor
-        self.motor = MotorController()
+        self.motor = StepperMotorController()
         self.motor.enable()
 
         # I/O
@@ -40,12 +53,14 @@ class SortingNode(Node):
         self.sorting_busy = False
         self.last_hash = None
 
-        self.get_logger().info("[SortingNode] Ready. One full spin per classification.")
+        self.get_logger().info("[SortingNode] Ready. Stepper motor positioning for bin sorting.")
+        self.get_logger().info(f"[SortingNode] Bin angles: {self.bin_angles}")
+        self.get_logger().info(f"[SortingNode] Speed delay: {self.stepper_speed_delay}s, Hold position: {self.hold_position}")
 
     # ---------------- Callbacks ----------------
 
     def _on_classification(self, msg: String):
-        """Handle classification_done: spin one revolution, publish sorting_done."""
+        """Handle classification_done: move to appropriate bin angle, publish sorting_done."""
         try:
             payload = json.loads(msg.data)
         except Exception as e:
@@ -67,20 +82,46 @@ class SortingNode(Node):
 
         self.sorting_busy = True
         try:
+            # Log classification received
+            self.get_logger().info(f"[SortingNode] Classification received: {cls}")
+            
+            # Get target angle for this material (default to cardboard/0° for unknown)
+            target_angle = self.bin_angles.get(cls, 0)
+            
+            # Log target angle
+            current_angle = self.motor.get_current_angle()
+            self.get_logger().info(f"[SortingNode] Target angle: {target_angle}°")
+            self.get_logger().info(f"[SortingNode] Current → target position: {current_angle:.1f}° → {target_angle}°")
+            
+            # Small delay before movement
             time.sleep(self.sorting_delay)
 
-            # Map speed to RPM
-            max_rpm = self.motor.MAX_SPEED_RPM
-            rpm = max(1.0, min(self.stepper_speed * max_rpm, max_rpm))
+            # Move to target angle
+            self.motor.go_to_angle(target_angle, speed_delay=self.stepper_speed_delay)
+            
+            # Get final angle for verification
+            final_angle = self.motor.get_current_angle()
+            
+            # Log completion
+            self.get_logger().info(f"[SortingNode] Positioning complete at {final_angle:.1f}°")
 
-            self.get_logger().info(f"[SortingNode] Spinning one revolution at {rpm:.1f} RPM for {cls}")
-            self.motor.spin_one_revolution(rpm=rpm, clockwise=True)
+            # Optionally return to home position
+            if self.return_to_home:
+                time.sleep(0.5)  # Brief pause at target
+                self.get_logger().info("[SortingNode] Returning to home position")
+                self.motor.go_to_angle(0, speed_delay=self.stepper_speed_delay)
+                final_angle = 0
 
+            # Optionally disable motor to save power
+            if not self.hold_position:
+                self.motor.disable()
+
+            # Publish completion message with new format
             done = {
                 "status": "complete",
                 "material": cls,
-                "action": "spin_1_rev",
-                "rpm": rpm,
+                "action": f"moved_to_{int(target_angle)}_degrees",
+                "angle": final_angle,
                 "timestamp": time.time(),
             }
             out = String()
