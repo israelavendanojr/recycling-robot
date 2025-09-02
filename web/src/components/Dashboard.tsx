@@ -13,10 +13,10 @@ export const Dashboard: React.FC = () => {
         {/* Header */}
         <div className="text-center py-8">
           <h1 className="text-3xl font-bold text-brand-text-primary mb-2">
-            Recycling Robot Dashboard
+            Recycler Dashboard
           </h1>
           <p className="text-brand-text-secondary">
-            Real-time monitoring and classification analytics
+            Monitoring, controls, and analytics
           </p>
         </div>
 
