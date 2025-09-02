@@ -32,11 +32,10 @@ class SortingNode(Node):
 
         # Classification to angle mapping (4 bins, removed glass for safety)
         self.bin_angles = {
-            "cardboard": 0,     # straight through (default)
-            "metal": 90,        # first bin
-            "plastic": 180,     # second bin  
-            "trash": 270,       # third bin
-            # Any unknown classification defaults to cardboard
+            "trash": 0,
+            "metal": 60,
+            "plastic": 120,
+            "cardboard": 180,
         }
 
         # Motor
