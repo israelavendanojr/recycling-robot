@@ -119,35 +119,34 @@ class StepperController:
 
 
 # --- Demo ---
+# --- Demo ---
 if __name__ == "__main__":
-    print("=== NEMA17 Sorting Chute Controller Demo ===")
+    print("=== NEMA17 Sorting Chute Controller Demo (Bin Angle Test) ===")
     stepper = StepperController(dir_pin=17, step_pin=27, en_pin=22,
                                 steps_per_rev=200, microsteps=1)
 
+    # Define the same bin angles as ROS2 SortingNode
+    bin_angles = {
+        "trash": 0,
+        "metal": 60,
+        "plastic": 120,
+        "cardboard": 180,
+    }
+
     try:
         stepper.enable_motor()
+        time.sleep(0.5)
 
-        time.sleep(.5)
+        # Iterate through all bins
+        for material, angle in bin_angles.items():
+            print(f"\n--- Moving to {material} bin ({angle}°) ---")
+            stepper.go_to_angle(angle, speed_delay=0.003)  # slightly slower for clarity
+            time.sleep(2)
 
-        print("Calibrating quarter turns...")
-        # Quarter turns
-        stepper.go_to_angle(90)
-        time.sleep(1)
-        stepper.go_to_angle(180)
-        time.sleep(1)
-        stepper.go_to_angle(270)
-        time.sleep(1)
+        print("\nReturning to home (trash, 0°)")
         stepper.go_to_angle(0)
         time.sleep(1)
 
-        # Calibration: one full revolution
-        print("Calibrating one full revolution...")
-        stepper.step_motor(200, direction=1, delay_s=0.005)
-        time.sleep(.5)
-        stepper.step_motor(200, direction=0, delay_s=0.005)
-        time.sleep(.5)
-        
-
-        print("=== Demo Complete ===")
+        print("=== Bin Angle Test Complete ===")
     finally:
         stepper.disable_motor()

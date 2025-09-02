@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ROS2 Sorting Node — one full stepper revolution per classification
+ROS2 Sorting Node — stepper motor positioning for bin sorting
 Topic in:  /pipeline/classification_done   (std_msgs/String JSON)
 Topic out: /pipeline/sorting_done          (std_msgs/String JSON)
 """
@@ -11,7 +11,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
-# Import the stepper controller (path matches your repo layout)
+# Import the stepper controller
 from recycling_robot.utils.stepper_motor_controller import StepperMotorController
 
 
@@ -19,28 +19,31 @@ class SortingNode(Node):
     def __init__(self):
         super().__init__("sorting_node")
 
-        # ROS2 Parameters
-        self.declare_parameter("sorting_delay", 0.5)                    # pause before actuation
+        # ROS2 Parameters (simplified)
         self.declare_parameter("stepper_speed_delay", 0.002)           # step delay (lower = faster)
         self.declare_parameter("hold_position_after_sort", True)       # keep motor energized
         self.declare_parameter("return_to_home_after_sort", False)     # return to 0° after sort
 
-        self.sorting_delay = float(self.get_parameter("sorting_delay").value)
         self.stepper_speed_delay = float(self.get_parameter("stepper_speed_delay").value)
         self.hold_position = bool(self.get_parameter("hold_position_after_sort").value)
         self.return_to_home = bool(self.get_parameter("return_to_home_after_sort").value)
 
-        # Classification to angle mapping (4 bins, removed glass for safety)
+        # Classification to angle mapping (0-180° arc, matches physical layout)
         self.bin_angles = {
-            "trash": 0,
-            "metal": 60,
-            "plastic": 120,
-            "cardboard": 180,
+            "trash": 0,        # forward
+            "metal": 60,       # first wedge  
+            "plastic": 120,    # left wedge
+            "cardboard": 180,  # far left
         }
 
-        # Motor
+        # Motor initialization
         self.motor = StepperMotorController()
         self.motor.enable()
+        
+        # Home to 0° (trash bin) on startup - critical for angle tracking
+        self.get_logger().info("[SortingNode] Moving to home (trash bin, 0°)")
+        self.motor.go_to_angle(0, speed_delay=self.stepper_speed_delay)
+        self.get_logger().info("[SortingNode] Home position set")
 
         # I/O
         self.sub = self.create_subscription(
@@ -66,7 +69,7 @@ class SortingNode(Node):
             self.get_logger().error(f"[SortingNode] Invalid JSON: {e}")
             return
 
-        # Basic dedupe (optional)
+        # Basic dedupe
         cls = payload.get("class", "unknown")
         ts = payload.get("timestamp", time.time())
         h = f"{cls}_{int(ts)}"
@@ -84,24 +87,20 @@ class SortingNode(Node):
             # Log classification received
             self.get_logger().info(f"[SortingNode] Classification received: {cls}")
             
-            # Get target angle for this material (default to cardboard/0° for unknown)
+            # Get target angle for this material (default to trash/0° for unknown)
             target_angle = self.bin_angles.get(cls, 0)
-            
-            # Log target angle
             current_angle = self.motor.get_current_angle()
-            self.get_logger().info(f"[SortingNode] Target angle: {target_angle}°")
-            self.get_logger().info(f"[SortingNode] Current → target position: {current_angle:.1f}° → {target_angle}°")
             
-            # Small delay before movement
-            time.sleep(self.sorting_delay)
-
+            self.get_logger().info(f"[SortingNode] Moving from {current_angle:.1f}° to {target_angle}° ({cls} bin)")
+            
+            # Guarantee motor is enabled before movement
+            self.motor.enable()
+            
             # Move to target angle
             self.motor.go_to_angle(target_angle, speed_delay=self.stepper_speed_delay)
             
             # Get final angle for verification
             final_angle = self.motor.get_current_angle()
-            
-            # Log completion
             self.get_logger().info(f"[SortingNode] Positioning complete at {final_angle:.1f}°")
 
             # Optionally return to home position
@@ -111,11 +110,11 @@ class SortingNode(Node):
                 self.motor.go_to_angle(0, speed_delay=self.stepper_speed_delay)
                 final_angle = 0
 
-            # Optionally disable motor to save power
+            # Keep motor enabled for quick response unless configured otherwise
             if not self.hold_position:
                 self.motor.disable()
 
-            # Publish completion message with new format
+            # Publish completion message
             done = {
                 "status": "complete",
                 "material": cls,
@@ -137,8 +136,22 @@ class SortingNode(Node):
     def destroy_node(self):
         try:
             self.get_logger().info("[SortingNode] Shutting down...")
+            
+            # Return to home position before shutdown for safety
+            if hasattr(self, "motor") and self.motor.gpio_initialized:
+                self.get_logger().info("[SortingNode] Returning to home before shutdown...")
+                try:
+                    self.motor.go_to_angle(0, speed_delay=self.stepper_speed_delay)
+                    time.sleep(0.5)  # Brief pause at home
+                    self.motor.disable()
+                    self.get_logger().info("[SortingNode] Home position reached and motor disabled")
+                except Exception as e:
+                    self.get_logger().error(f"[SortingNode] Failed to return home: {e}")
+            
+            # Clean up motor resources
             if hasattr(self, "motor"):
                 self.motor.cleanup()
+                
         finally:
             super().destroy_node()
 
