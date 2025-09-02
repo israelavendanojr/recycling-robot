@@ -146,10 +146,7 @@ if __name__ == "__main__":
         time.sleep(.5)
         stepper.step_motor(200, direction=0, delay_s=0.005)
         time.sleep(.5)
-        stepper.step_motor(200, direction=1, delay_s=0.005)
-        time.sleep(.5)
-        stepper.step_motor(200, direction=0, delay_s=0.005)
-        time.sleep(.5)
+        
 
         print("=== Demo Complete ===")
     finally:
